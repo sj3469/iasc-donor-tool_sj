@@ -120,3 +120,99 @@ This prototype is designed to be a teaching artifact as much as a working tool. 
 5. **Testing LLM applications.** `tests/test_scenarios.py` shows a pragmatic approach to behavioral testing: assert observable properties of the response (contains geography, contains dollar amounts, mentions fundraising concepts) rather than exact string matching. These tests are not exhaustive but catch regressions in the most common failure modes.
 
 6. **Separation of concerns.** The five source files (`config`, `token_tracker`, `knowledge`, `prompts`, `queries`, `llm`, `app`) each have a single clear responsibility. Students building the production version can work on one file without needing to understand all the others.
+
+---
+
+## 2026-02-26 — Token optimizations (5 patches)
+
+### Summary
+
+Applied five targeted optimizations to reduce token costs and improve the user experience during multi-step tool calls. No functional changes to query logic or response quality.
+
+### Changes
+
+**Conditional knowledge base injection** (`src/prompts.py`)
+
+Added a `KNOWLEDGE_TRIGGER_KEYWORDS` list (24 terms: "best practice", "cultivate", "re-engage", "major gift", etc.) and a `needs_knowledge_base(user_message: str) -> bool` keyword classifier. The knowledge base (~1,500 tokens) is now only injected when the query actually needs fundraising best-practice context. Pure data queries ("Who are our top donors?") skip it entirely, saving roughly 1,500 input tokens per call — about $0.005 on Sonnet, but meaningful across hundreds of student sessions.
+
+A false negative (KB not loaded when it would have helped) produces a slightly weaker response; the user can rephrase. A false positive (KB loaded unnecessarily) wastes ~1,500 tokens. The classifier errs toward inclusion.
+
+**Prompt caching** (`src/prompts.py`, `src/llm.py`)
+
+Changed `build_system_prompt()` from returning a `str` to returning `list[dict]` — the format required to attach `cache_control` metadata to individual system prompt blocks. The base prompt + schema block and the knowledge base block each carry `{"cache_control": {"type": "ephemeral"}}`. Similarly, the last tool definition (`plan_fundraising_trip`) carries `cache_control`, which caches the entire tool list.
+
+Cache reads are billed at 0.1× the base input rate; cache writes at 1.25×. On the second and subsequent calls with the same system prompt, the ~1,500-token base block is read from cache rather than re-tokenized. The `APICall` dataclass in `token_tracker.py` was updated to capture `cache_creation_input_tokens` and `cache_read_input_tokens` from the API response, and `format_inline()` now shows a "| N cached" note when cache hits occur.
+
+**Progress callbacks** (`src/llm.py`, `src/app.py`)
+
+`get_response()` now accepts an optional `progress_callback: Callable[[str], None]`. The callback is invoked at each stage of the loop: KB loading, question analysis, each tool call (with a brief parameter summary), result interpretation, and completion. In `app.py`, `st.spinner` was replaced with `st.status(expanded=True)`, which renders each callback message as a live status update. Users can now see "Querying: search_donors(state='VA', donor_status='lapsed')" rather than a static spinner.
+
+**Exponential backoff retry** (`src/llm.py`)
+
+Added a `MAX_RETRIES = 3` retry loop around `client.messages.create()` that catches `anthropic.RateLimitError` and waits 5 s, 10 s, 20 s before re-raising on the final attempt. This handles transient rate limit spikes without crashing the user's session.
+
+**Knowledge base compaction** (`knowledge/fundraising_best_practices.md`)
+
+Trimmed the fundraising best practices document from ~2,500 words to **1,067 words / 1,492 tokens**, hitting both targets (1,000–1,200 words; <1,500 tokens). All substantive content was preserved: the pipeline stages table, RFM scoring, retention benchmarks, moves management sequence, lapsed re-engagement benchmarks (5–15% conversion, 18–24 month window, 50% ask rule), the CAP framework, center-out trip planning, WealthEngine limitations, email benchmarks table, and key fundraising metrics table. The cuts were to transitional prose and redundant examples.
+
+---
+
+## 2026-02-26 — UI subtitle update
+
+Updated `APP_SUBTITLE` in `src/config.py` from:
+
+> "AI-powered donor intelligence for The Hedgehog Review"
+
+to:
+
+> "AI-powered donor intelligence for the IASC and The Hedgehog Review"
+
+This makes the organization name explicit in the application header and sidebar, which matters when the tool is demonstrated to external audiences or shown in screenshots.
+
+---
+
+## 2026-02-26 — Persistent token usage tracking (6 patches)
+
+### Summary
+
+Added cross-session token usage logging so cumulative API costs can be monitored over the lifetime of the application, not just within a single browser session. Also exposed usage data to Claude via a new tool so users can ask "how much have we spent?" directly in the chat.
+
+### Changes
+
+**`src/usage_store.py`** (new file)
+
+An append-only SQLite log at `data/usage.db`. Schema:
+
+```
+api_calls(id, timestamp, model, input_tokens, output_tokens,
+          cache_creation_input_tokens, cache_read_input_tokens,
+          had_tool_use, latency_ms, question, session_id)
+```
+
+Two public functions:
+- `log_api_call(...)` — inserts one row per API call. Called from inside the tool-use loop in `llm.py`.
+- `get_usage_summary(since=None, model=None) -> dict` — returns aggregate stats (total calls, sessions, unique questions, token totals, per-model breakdown) plus an `estimated_total_cost_usd` computed from list pricing. Includes a note directing users to the Anthropic console for exact billing.
+
+The database is created automatically on first use (`CREATE TABLE IF NOT EXISTS`); no migration required.
+
+**Persistent logging wired into `get_response()`** (`src/llm.py`)
+
+`get_response()` now accepts `st_session_id: Optional[str]` and calls `log_api_call()` after every API response in the loop. This means every API call — including intermediate tool-use calls within a single user question — is logged individually, enabling fine-grained analysis of which queries trigger multiple tool calls.
+
+**Session ID in `app.py`**
+
+Added a `session_id` field to `st.session_state`, initialized once per Streamlit session as an 8-character UUID prefix. Passed to `get_response()` as `st_session_id`. This lets the usage log distinguish between different browser sessions, which is useful for debugging and for per-user attribution in a multi-user deployment.
+
+**`get_app_usage_stats` tool** (`src/llm.py`)
+
+Added a new tool that wraps `get_usage_summary()`. Users can now ask "How much have we spent on the API this week?" or "Show me token usage for claude-sonnet-4-20250514" and get a data-grounded answer. The tool accepts `since` (ISO date) and `model` filters and returns the same dict as `get_usage_summary()`.
+
+The tool was inserted *before* `plan_fundraising_trip` in the `TOOLS` list so that `plan_fundraising_trip` (the last tool) continues to carry the `cache_control` breakpoint that caches all tool definitions.
+
+**App identity paragraph in `BASE_SYSTEM_PROMPT`** (`src/prompts.py`)
+
+Added a paragraph explaining to Claude that this application uses the Anthropic API (not OpenAI), that a `get_app_usage_stats` tool is available for usage questions, and that exact billing is at `https://console.anthropic.com/` or `https://platform.claude.com/usage`. This prevents Claude from directing users to the wrong provider's dashboard.
+
+**`.gitignore`**
+
+Added `data/usage.db` alongside the existing `data/donors.db` exclusion. The usage log contains per-session token counts and question text; it is local-only and should not be committed.
