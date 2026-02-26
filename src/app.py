@@ -184,17 +184,22 @@ if user_input:
         for m in st.session_state.messages[:-1]
     ]
 
-    # Call Claude and stream/display the response
+    # Call Claude with a live progress display using st.status.
+    # progress_callback updates the status label at each step so the user can
+    # see which tool is being called rather than staring at a static spinner.
     with st.chat_message("assistant"):
-        with st.spinner("Querying donor data..."):
+        with st.status("Working on your question...", expanded=True) as status:
             try:
                 response_text, response_usage = get_response(
                     user_message=user_input,
                     conversation_history=history,
                     model=st.session_state.selected_model,
                     session_tracker=st.session_state.tracker,
+                    progress_callback=lambda msg: status.update(label=msg),
                 )
+                status.update(label="Done", state="complete", expanded=False)
             except Exception as e:
+                status.update(label="Error", state="error", expanded=False)
                 response_text = (
                     f"**Error:** {e}\n\n"
                     "Please check your ANTHROPIC_API_KEY in `.env` and try again."

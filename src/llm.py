@@ -11,14 +11,14 @@ import time
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable
 
 import anthropic
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import DEFAULT_MODEL, MAX_TOOL_CALLS_PER_TURN
-from prompts import build_system_prompt
+from prompts import build_system_prompt, needs_knowledge_base
 from token_tracker import APICall, ResponseUsage, SessionTracker
 import queries
 
@@ -123,6 +123,7 @@ TOOLS = [
     {
         "name": "plan_fundraising_trip",
         "description": "Find the best contacts to meet during a fundraising trip to a specific area. Ranks by composite score: giving history, wealth, engagement, recency, subscription. Use for trip planning questions.",
+        "cache_control": {"type": "ephemeral"},  # caches all 7 tool definitions
         "input_schema": {
             "type": "object",
             "properties": {
@@ -171,6 +172,23 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         return json.dumps({"error": f"Tool execution failed: {e}"})
 
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _summarize_tool_params(tool_name: str, params: dict) -> str:
+    """Create a brief human-readable summary of tool call parameters for progress display."""
+    if not params:
+        return ""
+    items = []
+    for k, v in list(params.items())[:3]:
+        if isinstance(v, str) and len(v) > 20:
+            v = v[:17] + "..."
+        items.append(f"{k}={v!r}")
+    suffix = ", ..." if len(params) > 3 else ""
+    return ", ".join(items) + suffix
+
+
+MAX_RETRIES = 3
+
 # ─── Main conversation function ───────────────────────────────────────────────
 
 def get_response(
@@ -178,6 +196,7 @@ def get_response(
     conversation_history: list[dict],
     model: str = DEFAULT_MODEL,
     session_tracker: Optional[SessionTracker] = None,
+    progress_callback: Optional[Callable[[str], None]] = None,
 ) -> tuple[str, ResponseUsage]:
     """Send a user message through the full tool-use conversation loop.
 
@@ -186,17 +205,33 @@ def get_response(
     - A ResponseUsage object with token usage for this question
 
     The conversation loop:
-    1. Send message + history + tools to Claude
-    2. If Claude requests tool calls: execute them, append results, repeat
-    3. Once Claude returns a text response: return it
+    1. Decide whether the question needs the knowledge base (keyword check)
+    2. Send message + history + tools to Claude
+    3. If Claude requests tool calls: execute them, append results, repeat
+    4. Once Claude returns a text response: return it
 
     Token usage is accumulated across all API calls for this one user question.
+
+    Args:
+        progress_callback: Optional function that receives status strings for UI display.
+                           Called at each step (KB load, tool calls, interpretation).
     """
     client = anthropic.Anthropic()
-    system_prompt = build_system_prompt()
+
+    def update_progress(msg: str):
+        if progress_callback:
+            progress_callback(msg)
+
+    # Decide whether to include the knowledge base based on the query content.
+    # This skips ~2,000 tokens on pure data queries.
+    include_kb = needs_knowledge_base(user_message)
+    if include_kb:
+        update_progress("Loading fundraising knowledge base...")
+    system_prompt = build_system_prompt(include_knowledge=include_kb)
+
+    update_progress("Analyzing your question...")
 
     # Build the messages list for this turn.
-    # We append the new user message to the conversation history.
     messages = conversation_history + [{"role": "user", "content": user_message}]
 
     # Track usage for this response (may span multiple API calls)
@@ -205,20 +240,34 @@ def get_response(
     tool_call_count = 0
 
     while tool_call_count <= MAX_TOOL_CALLS_PER_TURN:
-        # Time the API call
+        # Time the API call (with exponential-backoff retry for rate limits)
         start_time = time.time()
+        response = None
 
-        response = client.messages.create(
-            model=model,
-            max_tokens=4096,
-            system=system_prompt,
-            tools=TOOLS,
-            messages=messages,
-        )
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = client.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    system=system_prompt,
+                    tools=TOOLS,
+                    messages=messages,
+                )
+                break  # success — exit retry loop
+            except anthropic.RateLimitError:
+                if attempt < MAX_RETRIES - 1:
+                    wait_time = 2 ** attempt * 5  # 5s, 10s, 20s
+                    update_progress(
+                        f"Rate limited; waiting {wait_time}s before retry "
+                        f"({attempt + 1}/{MAX_RETRIES})..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise  # re-raise on the final attempt
 
         latency_ms = (time.time() - start_time) * 1000
 
-        # Record this API call
+        # Record this API call, including cache usage if present
         had_tool_use = any(block.type == "tool_use" for block in response.content)
         api_call = APICall(
             timestamp=datetime.now(),
@@ -227,6 +276,9 @@ def get_response(
             model=model,
             had_tool_use=had_tool_use,
             latency_ms=latency_ms,
+            # These fields are only present when caching is active; default to 0
+            cache_creation_input_tokens=getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
+            cache_read_input_tokens=getattr(response.usage, "cache_read_input_tokens", 0) or 0,
         )
         response_usage.calls.append(api_call)
 
@@ -240,11 +292,13 @@ def get_response(
 
             return final_text, response_usage
 
-        # Claude wants to call tools — execute them all and collect results
+        # Claude wants to call tools — execute them and collect results
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
                 tool_call_count += 1
+                params_summary = _summarize_tool_params(block.name, block.input)
+                update_progress(f"Querying: {block.name}({params_summary})")
                 result_str = execute_tool(block.name, block.input)
                 tool_results.append({
                     "type": "tool_result",
@@ -252,13 +306,15 @@ def get_response(
                     "content": result_str,
                 })
 
+        update_progress("Interpreting results...")
+
         # Append Claude's response (with tool_use blocks) and the tool results.
         # The Anthropic API requires that tool results be sent as a "user" turn
         # following the "assistant" turn that requested the tools.
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
 
-    # Safety valve: we exceeded MAX_TOOL_CALLS_PER_TURN
+    # Safety valve: exceeded MAX_TOOL_CALLS_PER_TURN
     if session_tracker is not None:
         session_tracker.responses.append(response_usage)
     return (

@@ -2,8 +2,9 @@
 System prompts and prompt templates for the IASC donor analytics assistant.
 
 The system prompt is assembled dynamically: a base prompt defines the assistant's
-role and behavior, then the knowledge base content is appended. This keeps the
-knowledge base modular and replaceable (e.g., with RAG or a Claude Skill later).
+role and behavior, then the knowledge base content is optionally appended.
+The knowledge base is only loaded when the user's question needs it (see
+needs_knowledge_base()), saving ~2,000 tokens on pure data queries.
 """
 import sys
 from pathlib import Path
@@ -58,8 +59,68 @@ Context about IASC's fundraising:
 - They track donors in Salesforce, email engagement in MailChimp, and wealth data via WealthEngine.
 """
 
+# Keywords that indicate the user's question needs fundraising best-practice context.
+# A false negative just means the response won't reference best practices (minor downside);
+# a false positive costs ~2,000 extra input tokens (cheap). Err toward inclusion.
+KNOWLEDGE_TRIGGER_KEYWORDS = [
+    "best practice", "strategy", "how to", "recommend", "advice",
+    "approach", "re-engage", "re-engagement", "cultivate", "cultivation",
+    "retention", "pipeline", "moves management", "major gift",
+    "prospect research", "donor pyramid", "rfm", "wealth screen",
+    "center-out", "stewardship", "solicitation", "annual fund",
+    "capital campaign", "planned giving", "donor lifecycle",
+    "engagement strategy", "outreach plan", "thank", "acknowledge",
+]
 
-def build_system_prompt() -> str:
-    """Assemble the full system prompt: base instructions + schema + knowledge base."""
-    kb_content = load_knowledge_base()
-    return BASE_SYSTEM_PROMPT + DB_SCHEMA_SUMMARY + kb_content
+
+def needs_knowledge_base(user_message: str) -> bool:
+    """Check whether the user's question likely needs fundraising best-practice context.
+
+    Uses simple keyword matching. This avoids an extra API call; a false negative
+    just means the response won't reference best practices (the user can ask a
+    follow-up), while a false positive only costs ~2K extra input tokens.
+    """
+    msg_lower = user_message.lower()
+    return any(kw in msg_lower for kw in KNOWLEDGE_TRIGGER_KEYWORDS)
+
+
+def build_system_prompt(include_knowledge: bool = False) -> list[dict]:
+    """Assemble the system prompt as a list of content blocks for the API.
+
+    Returns a list of dicts suitable for the 'system' parameter of messages.create().
+    The last block carries cache_control so the entire prefix is cached by the API.
+
+    Args:
+        include_knowledge: If True, append the fundraising knowledge base. Set this
+                           based on needs_knowledge_base() for the current query.
+    """
+    base_content = BASE_SYSTEM_PROMPT + DB_SCHEMA_SUMMARY
+
+    if include_knowledge:
+        kb_content = load_knowledge_base()
+        # Two blocks: base prompt is a stable cacheable prefix; KB block gets the
+        # cache breakpoint so both are cached together on the second call.
+        return [
+            {"type": "text", "text": base_content},
+            {
+                "type": "text",
+                "text": kb_content,
+                "cache_control": {"type": "ephemeral"},
+            },
+        ]
+    else:
+        # Single block with a short note so Claude knows the KB exists but isn't loaded.
+        # cache_control here caches the base prompt + schema (~1,500 tokens).
+        fallback_note = (
+            "\n\nNote: A fundraising best-practices knowledge base is available. "
+            "If the user asks about strategy, best practices, or 'how to' questions "
+            "about fundraising, let them know you can provide guidance and ask them "
+            "to rephrase if needed.\n"
+        )
+        return [
+            {
+                "type": "text",
+                "text": base_content + fallback_note,
+                "cache_control": {"type": "ephemeral"},
+            },
+        ]
