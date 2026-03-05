@@ -22,7 +22,7 @@ except Exception:
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 # Model configuration
-DEFAULT_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 AVAILABLE_MODELS = {
     "claude-sonnet-4-20250514": "Sonnet (recommended)",
     "claude-haiku-4-5-20251001": "Haiku (faster, cheaper)",
