@@ -15,8 +15,7 @@ BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "donors.db"
 
 # 4. API Key Resolution (Web vs Local)
-# This looks in Streamlit Secrets first, then your local environment.
-# KEEP THESE LABELS EXACTLY AS WRITTEN IN QUOTES.
+# This looks for the label "GEMINI_API_KEY" in your Streamlit Secrets Dashboard.
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 # 5. Model Settings
@@ -26,7 +25,8 @@ AVAILABLE_MODELS = {
 }
 DEFAULT_MODEL = "gemini-2.0-flash"
 
-# 6. Inject keys into environment correctly
-# This is where the magic happens. The labels in quotes stay the same.
+# 6. Inject key into environment ONLY if it exists [CRITICAL FIX]
+# We use the variable 'GEMINI_API_KEY' defined on line 19. 
+# We do NOT paste the AIzaSy string here.
 if GEMINI_API_KEY:
-    os.environ["GEMINI_API_KEY"] = AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA
+    os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
