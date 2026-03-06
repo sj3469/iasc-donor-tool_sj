@@ -15,15 +15,17 @@ BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "data" / "donors.db"
 
 # 4. API Key Resolution (Web vs Local)
-# This looks in Streamlit Secrets first (for the web), then your local environment.
-GEMINI_API_KEY = st.secrets.get(AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA) or os.getenv(AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA) or "AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA"
+# This looks in Streamlit Secrets first, then your local environment.
+GEMINI_API_KEY = st.secrets.get("AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA") or os.getenv("AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA")
+
+# 5. Model Settings
+AVAILABLE_MODELS = {
     "gemini-2.0-flash": "Gemini 2.0 Flash (Fastest)",
     "gemini-1.5-pro": "Gemini 1.5 Pro (Most Capable)",
     "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet",
 }
 DEFAULT_MODEL = "gemini-2.0-flash"
 
-# 6. Inject keys into environment [CRITICAL FIX]
-# Use the string names "GEMINI_API_KEY" so the model knows where to look.
+# 6. Inject keys into environment correctly
 if GEMINI_API_KEY:
     os.environ["AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA"] = GEMINI_API_KEY
