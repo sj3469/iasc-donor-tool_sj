@@ -30,5 +30,3 @@ DEFAULT_MODEL = "gemini-2.0-flash"
 # Inject keys into environment so the clients can find them automatically
 if GEMINI_API_KEY:
     os.environ[AIzaSyAwNhYgYsyPfn15l4I8gF8T6Z-ukMfpaCA] = GEMINI_API_KEY
-if ANTHROPIC_API_KEY:
-    os.environ[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] = ANTHROPIC_API_KEY
