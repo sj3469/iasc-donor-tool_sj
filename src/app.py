@@ -1,12 +1,14 @@
 """
-IASC Donor Analytics — Streamlit application.
-
+IASC Donor Analytics — Expert Gemini-Style UI with Sidebar
 Main entry point: streamlit run src/app.py
 """
 
 import sys
+import pandas as pd
+import sqlite3
 from pathlib import Path
 import streamlit as st
+import uuid
 
 # Auto-initialize the donor database if it does not exist.
 # This runs on first startup in Streamlit Cloud and GitHub Codespaces.
@@ -23,214 +25,156 @@ if not _db_path.exists():
 
 # Add src to path for imports so this works regardless of where streamlit is launched
 sys.path.insert(0, str(Path(__file__).parent))
-
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL, DB_PATH
 from llm import get_response
 from token_tracker import SessionTracker
 from knowledge import get_knowledge_token_estimate
 
-# ─── Page configuration ───────────────────────────────────────────────────────
-
+# 2. Page & Theme Configuration
 st.set_page_config(
     page_title=APP_TITLE,
-    page_icon="H",  # Hedgehog Review initial
+    page_icon="📊",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# ─── Session state initialization ─────────────────────────────────────────────
+# Custom CSS for Gemini-style look and fixed-width sidebar
+st.markdown("""
+    <style>
+    .stApp { background-color: #ffffff; }
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+        min-width: 320px;
+        max-width: 320px;
+    }
+    .stChatMessage { border-radius: 12px; margin-bottom: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-if "messages" not in st.session_state:
-    # Each entry: {"role": str, "content": str, "usage": ResponseUsage|None}
-    st.session_state.messages = []
-
-if "tracker" not in st.session_state:
-    st.session_state.tracker = SessionTracker()
-
-if "selected_model" not in st.session_state:
-    st.session_state.selected_model = DEFAULT_MODEL
-
-# pending_question is set by sample question buttons and consumed on the next run.
-# This is necessary because st.button() callbacks can't directly inject into
-# st.chat_input(); instead we store the pending question in session state,
-# call st.rerun(), and pick it up as user_input on the next render cycle.
-if "pending_question" not in st.session_state:
-    st.session_state.pending_question = None
-
-if "session_id" not in st.session_state:
-    import uuid
-    st.session_state.session_id = str(uuid.uuid4())[:8]
-
-# ─── Sidebar ─────────────────────────────────────────────────────────────────
-
-with st.sidebar:
-    st.title(APP_TITLE)
-    st.caption(APP_SUBTITLE)
-    st.divider()
-
-    # Quick stats from the database — loaded once per sidebar render
-    st.subheader("Quick stats")
-    if DB_PATH.exists():
-        try:
-            import sqlite3
-            conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-
-            stats = cur.execute("""
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN donor_status IN ('active','lapsed','new_donor') THEN 1 ELSE 0 END) as donors,
-                    SUM(CASE WHEN donor_status = 'prospect' THEN 1 ELSE 0 END) as prospects,
-                    SUM(CASE WHEN donor_status = 'lapsed' THEN 1 ELSE 0 END) as lapsed,
-                    SUM(CASE WHEN donor_status = 'active' THEN 1 ELSE 0 END) as active,
-                    SUM(CASE WHEN donor_status = 'new_donor' THEN 1 ELSE 0 END) as new_donors,
-                    ROUND(SUM(COALESCE(total_gifts, 0)), 0) as total_giving,
-                    ROUND(AVG(CASE WHEN average_gift IS NOT NULL THEN average_gift END), 0) as avg_gift
-                FROM contacts
-            """).fetchone()
+# 3. Data Initialization (Fix: Database Not Found)
+def initialize_database():
+    """Converts the uploaded CSV to the SQLite DB format the app expects."""
+    if not DB_PATH.exists():
+        csv_path = Path("data/mock_dataset3.csv")
+        if csv_path.exists():
+            df = pd.read_csv(csv_path)
+            conn = sqlite3.connect(DB_PATH)
+            # Table 'contacts' is required for the sidebar KPI logic
+            df.to_sql("contacts", conn, index=False, if_exists="replace")
             conn.close()
 
-            total_giving_fmt = f"${stats['total_giving']:,.0f}" if stats['total_giving'] else "N/A"
-            avg_gift_fmt = f"${stats['avg_gift']:,.0f}" if stats['avg_gift'] else "N/A"
+initialize_database()
 
-            st.metric("Total contacts", f"{stats['total']:,}")
-            col1, col2 = st.columns(2)
-            col1.metric("Active donors", stats['active'])
-            col2.metric("Lapsed donors", stats['lapsed'])
-            col1.metric("Prospects", stats['prospects'])
-            col2.metric("New donors", stats['new_donors'])
-            st.metric("Total lifetime giving", total_giving_fmt)
-            st.metric("Average gift", avg_gift_fmt)
-        except Exception as e:
-            st.warning(f"Could not load stats: {e}")
-    else:
-        st.warning("Database not found. Run: `python data/generate_mock_data.py`")
+# 4. Session State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "tracker" not in st.session_state:
+    st.session_state.tracker = SessionTracker()
+if "selected_model" not in st.session_state:
+    st.session_state.selected_model = DEFAULT_MODEL
+if "pending_question" not in st.session_state:
+    st.session_state.pending_question = None
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())[:8]
 
+# 5. SIDEBAR (The restored navigation and stats panel)
+with st.sidebar:
+    st.title(f"📊 {APP_TITLE}")
+    st.caption("IASC Donor Intelligence")
     st.divider()
 
-    # Sample questions — clicking one sets pending_question and reruns the app
-    st.subheader("Sample questions")
-    sample_questions = [
-        "Who are our top 10 donors by lifetime giving?",
-        "Which lapsed donors in Virginia should we re-engage?",
-        "Plan a fundraising trip to NYC: who should we meet?",
-        "How many subscribers have never donated but have high wealth scores?",
-        "What does our donor pipeline look like?",
-        "Which new donors from the last year should we cultivate?",
-        "Show me donors who gave via stock or DAF",
-        "What are best practices for re-engaging lapsed donors?",
-    ]
-
-    for q in sample_questions:
-        if st.button(q, key=f"sample_{hash(q)}", use_container_width=True):
-            st.session_state.pending_question = q
-            st.rerun()
-
-    st.divider()
-
-    # Session usage summary
-    st.subheader("Session usage")
-    st.markdown(st.session_state.tracker.format_sidebar())
-
-    st.divider()
-
-    # Model selector
-    st.subheader("Settings")
-    # Build the display list from AVAILABLE_MODELS, preserving order
-    model_labels = list(AVAILABLE_MODELS.values())
-    current_label = AVAILABLE_MODELS.get(st.session_state.selected_model, model_labels[0])
-    selected_label = st.selectbox(
-        "Model",
-        options=model_labels,
-        index=model_labels.index(current_label),
+    # File Uploader (Gemini-style attachment)
+    st.subheader("📎 Attach Files")
+    uploaded_file = st.file_uploader(
+        "Add lists or reports", 
+        type=["pdf", "csv", "png", "jpg"],
+        label_visibility="collapsed"
     )
-    # Map the chosen label back to a model ID
-    for model_id, label in AVAILABLE_MODELS.items():
-        if label == selected_label:
-            st.session_state.selected_model = model_id
-            break
+    if uploaded_file:
+        st.info(f"Attached: {uploaded_file.name}")
 
-    # Knowledge base size hint — helps students understand token costs
-    kb_tokens = get_knowledge_token_estimate()
-    st.caption(f"Knowledge base: ~{kb_tokens:,} tokens per query")
-
-    # Clear conversation
     st.divider()
-    if st.button("Clear conversation", use_container_width=True):
+
+    # Real-time KPIs from mock_dataset3.csv
+    st.subheader("IASC Quick Stats")
+    try:
+        conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        stats = cur.execute("""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(CASE WHEN donor_status = 'active' THEN 1 END) as active,
+                ROUND(SUM(COALESCE(total_gifts, 0)), 0) as total_giving
+            FROM contacts
+        """).fetchone()
+        conn.close()
+
+        c1, c2 = st.columns(2)
+        c1.metric("Contacts", f"{stats['total']:,}")
+        c2.metric("Active", stats['active'])
+        st.metric("Total Giving", f"${stats['total_giving']:,.0f}")
+    except:
+        st.caption("Stats will sync on data load...")
+
+    st.divider()
+    
+    # Model & Clearing Tools
+    with st.expander("⚙️ Settings"):
+        model_labels = list(AVAILABLE_MODELS.values())
+        sel = st.selectbox("Model", options=model_labels)
+        for mid, lab in AVAILABLE_MODELS.items():
+            if lab == sel: st.session_state.selected_model = mid
+        st.caption(f"Knowledge Base: ~{get_knowledge_token_estimate():,} tokens")
+
+    if st.button("🗑️ Clear Chat", use_container_width=True):
         st.session_state.messages = []
         st.session_state.tracker = SessionTracker()
         st.rerun()
 
-# ─── Main chat area ────────────────────────────────────────────────────────────
+# 6. MAIN CHAT AREA
+st.markdown("<h2 style='text-align: center;'>Ask anything about your donor community</h2>", unsafe_allow_html=True)
 
-st.header(APP_TITLE)
-st.caption(APP_SUBTITLE)
-
-# Render the full conversation history
+# Render history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        # Show token usage inline below each assistant message
-        if msg.get("usage") is not None:
+        if msg.get("usage"):
             st.caption(msg["usage"].format_inline(st.session_state.selected_model))
 
-# ─── Input handling ────────────────────────────────────────────────────────────
+# Sticky Input and Response Logic
+if prompt := st.chat_input("Ask a question..."):
+    # User message
+    st.chat_message("user").markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
 
-# The chat_input widget always renders at the bottom of the page
-user_input = st.chat_input("Ask a question about your donors...")
-
-# If a sidebar sample question was clicked on the previous run, use it now.
-# We only consume pending_question when there is no direct chat_input (the user
-# didn't type something simultaneously, which is theoretically impossible but
-# we guard for it anyway).
-if st.session_state.pending_question and not user_input:
-    user_input = st.session_state.pending_question
-    st.session_state.pending_question = None
-
-if user_input:
-    # Immediately display the user's message
-    with st.chat_message("user"):
-        st.markdown(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input, "usage": None})
-
-    # Build the conversation history to pass to the API.
-    # We exclude the message we just appended (it will be the new user_message
-    # argument to get_response) and strip the usage metadata the API doesn't need.
-    history = [
-        {"role": m["role"], "content": m["content"]}
-        for m in st.session_state.messages[:-1]
-    ]
-
-    # Call Claude with a live progress display using st.status.
-    # progress_callback updates the status label at each step so the user can
-    # see which tool is being called rather than staring at a static spinner.
+    # Assistant response
     with st.chat_message("assistant"):
-        with st.status("Working on your question...", expanded=True) as status:
+        with st.status("Analyzing...", expanded=True) as status:
             try:
                 response_text, response_usage = get_response(
-                    user_message=user_input,
-                    conversation_history=history,
+                    user_message=prompt,
+                    conversation_history=st.session_state.messages[:-1],
                     model=st.session_state.selected_model,
                     session_tracker=st.session_state.tracker,
-                    progress_callback=lambda msg: status.update(label=msg),
+                    progress_callback=lambda m: status.update(label=m),
                     st_session_id=st.session_state.session_id,
+                    attachment=uploaded_file
                 )
-                status.update(label="Done", state="complete", expanded=False)
+                status.update(label="Complete", state="complete", expanded=False)
             except Exception as e:
                 status.update(label="Error", state="error", expanded=False)
-                response_text = (
-                    f"**Error:** {e}\n\n"
-                    "Please check your ANTHROPIC_API_KEY in `.env` and try again."
-                )
+                response_text = f"**Error:** {e}"
                 response_usage = None
 
         st.markdown(response_text)
-        if response_usage is not None:
-            st.caption(response_usage.format_inline(st.session_state.selected_model))
+        
+        # Export button for tabular data
+        if any(kw in response_text.lower() for kw in ["list", "top", "donors"]):
+             st.download_button("📥 Export CSV", response_text, "export.csv", "text/csv")
 
-    # Persist the assistant message with usage metadata for the next render
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": response_text,
-        "usage": response_usage,
-    })
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": response_text, 
+            "usage": response_usage
+        })

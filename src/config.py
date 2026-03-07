@@ -1,18 +1,20 @@
-"""
-Configuration and constants for the IASC donor analytics tool.
-"""
 import os
 from pathlib import Path
+import streamlit as st
 from dotenv import load_dotenv
 
-# Load .env if present (for local development)
+# 1. Load local .env for local testing
 load_dotenv()
 
-# Paths
-PROJECT_ROOT = Path(__file__).parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge"
-DB_PATH = DATA_DIR / "donors.db"
+# 2. Page Metadata
+APP_TITLE = "IASC Donor Analytics"
+APP_SUBTITLE = "AI-powered donor intelligence for the IASC and The Hedgehog Review"
+
+# 3. Path Configurations [FIXED FOR YOUR SRC STRUCTURE]
+# Since mock_dataset3.csv is inside 'src', we point directly to it
+BASE_DIR = Path(__file__).parent
+CSV_PATH = BASE_DIR / "mock_dataset3.csv"
+DB_PATH = BASE_DIR / "donors.db"
 
 # API configuration
 try:
@@ -24,14 +26,11 @@ except Exception:
 # Model configuration
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 AVAILABLE_MODELS = {
-    "claude-sonnet-4-20250514": "Sonnet (recommended)",
-    "claude-haiku-4-5-20251001": "Haiku (faster, cheaper)",
+    "gemini-2.0-flash": "Gemini 2.0 Flash (Fastest)",
+    "gemini-1.5-pro": "Gemini 1.5 Pro (Most Capable)",
 }
+DEFAULT_MODEL = "gemini-2.0-flash"
 
-# Tool use limits
-MAX_TOOL_CALLS_PER_TURN = 5  # prevent infinite loops
-MAX_RESULTS_PER_QUERY = 20   # default limit for search results
-
-# UI configuration
-APP_TITLE = "IASC Donor Analytics"
-APP_SUBTITLE = "AI-powered donor intelligence for the IASC and The Hedgehog Review"
+# 6. Inject key into environment safely
+if GEMINI_API_KEY:
+    os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
