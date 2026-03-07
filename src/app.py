@@ -14,7 +14,8 @@ st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "tracker" not in st.session_state:
-    st.session_state.tracker = SessionTokenTracker()
+    st.session_state.tracker = SessionTracker()
+
 
 # 3. Sidebar UI
 with st.sidebar:
