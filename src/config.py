@@ -23,8 +23,3 @@ DEFAULT_MODEL = "gemini-2.5-flash"
 
 if GEMINI_API_KEY:
     os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
-
-
-if GEMINI_API_KEY:
-    os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
-
