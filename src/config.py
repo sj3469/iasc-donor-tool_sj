@@ -10,14 +10,14 @@ load_dotenv()
 APP_TITLE = "IASC Donor Analytics"
 APP_SUBTITLE = "AI-powered donor intelligence for the IASC and The Hedgehog Review"
 
-# 3. Path Configurations [FIXED FOR YOUR SRC STRUCTURE]
-# Since mock_dataset3.csv is inside 'src', we point directly to it
+# 3. Path Configurations [UPDATED FOR YOUR SRC STRUCTURE]
+# This points directly to the files in the same folder as this script
 BASE_DIR = Path(__file__).parent
 CSV_PATH = BASE_DIR / "mock_dataset3.csv"
 DB_PATH = BASE_DIR / "donors.db"
 
 # 4. API Key Resolution (Web vs Local)
-# This looks for the label "GEMINI_API_KEY" in your Streamlit Secrets Dashboard.
+# Ensure "GEMINI_API_KEY" is set in your Streamlit Secrets Dashboard.
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 # 5. Model Settings
