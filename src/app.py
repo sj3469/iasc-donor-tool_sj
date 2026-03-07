@@ -180,6 +180,12 @@ def inject_css() -> None:
             outline: none !important;
         }
 
+        div[data-testid="stChatInput"] textarea:focus {
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+
         .usage-box {
             border: 1px solid #31415f;
             border-radius: 14px;
@@ -531,7 +537,7 @@ for message in thread["messages"]:
     render_message(message)
 
 submission = st.chat_input(
-    " ",
+    "Ask about your donor community...",
     accept_file="multiple",
     file_type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
     key="main_chat_input",
