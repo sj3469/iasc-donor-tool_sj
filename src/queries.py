@@ -1,43 +1,57 @@
 """
 queries.py — Data query functions for the IASC Donor Analytics tool.
+Uses the actual imported SQLite table built from mock_dataset3.csv.
 """
 
 import sqlite3
+from pathlib import Path
 from typing import Optional
 
-from config import DB_PATH
+DB_PATH = Path(__file__).parent / "donors.db"
+
+COL_CONTACT_ID = '"Contact ID"'
+COL_ZIP = '"Mailing Zip/Postal Code"'
+COL_FIRST_GIFT = '"First Gift Date"'
+COL_LAST_GIFT = '"Last Gift Date"'
+COL_AVG_GIFT = '"Average Gift"'
+COL_TOTAL_GIFTS = '"Total Gifts"'
+COL_NUM_GIFTS = '"Total Number of Gifts"'
+COL_DONOR_STATUS = '"donor_status"'
+COL_CREATED = '"contact_created_date"'
+COL_SUB_TYPE = '"subscription_type"'
+COL_SUB_STATUS = '"subscription_status"'
+COL_EMAIL_OPEN = '"email_open_rate"'
+COL_LAST_CLICK = '"last_email_click_date"'
+COL_EVENT_COUNT = '"event_attendance_count"'
+COL_GIVING_VEHICLE = '"giving_vehicle"'
+COL_WEALTH = '"wealth_score"'
 
 
 def get_db_connection() -> sqlite3.Connection:
-    """Open a read-only connection to the donor database."""
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def _rows_to_dicts(rows: list) -> list[dict]:
-    return [dict(row) for row in rows]
+def _rows_to_dicts(rows) -> list[dict]:
+    return [dict(r) for r in rows]
 
 
-def _get_contact_columns() -> set[str]:
+def _get_table_name() -> str:
     with get_db_connection() as conn:
-        rows = conn.execute("PRAGMA table_info(contacts)").fetchall()
-    return {row["name"] for row in rows}
+        rows = conn.execute(
+            """
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+            ORDER BY CASE WHEN name = 'contacts' THEN 0 ELSE 1 END, name
+            """
+        ).fetchall()
 
+    if not rows:
+        raise RuntimeError("No user tables found in donors.db")
 
-def _pick_column(columns: set[str], *candidates: str) -> Optional[str]:
-    normalized = {c.lower(): c for c in columns}
-    for candidate in candidates:
-        if candidate.lower() in normalized:
-            return normalized[candidate.lower()]
-    return None
-
-
-def _require_column(columns: set[str], *candidates: str) -> str:
-    col = _pick_column(columns, *candidates)
-    if not col:
-        raise RuntimeError(f"Missing expected column. Tried: {', '.join(candidates)}")
-    return col
+    return rows[0]["name"]
 
 
 def search_donors(
@@ -47,47 +61,62 @@ def search_donors(
     sort_by: str = "total_gifts",
     sort_order: str = "desc",
     limit: int = 20,
+    zip_code: Optional[str] = None,
 ) -> dict:
-    columns = _get_contact_columns()
+    table = _get_table_name()
 
-    state_col = _pick_column(columns, "state", "state_code", "province", "region")
-    city_col = _pick_column(columns, "city", "town")
-    donor_status_col = _pick_column(columns, "donor_status", "status", "donorstatus")
+    if state:
+        return {
+            "results": [],
+            "count": 0,
+            "summary": "This dataset does not include a state field. Try filtering by ZIP/postal code instead.",
+        }
 
     sort_map = {
-        "total_gifts": _pick_column(columns, "total_gifts", "totalgifts", "lifetime_giving"),
-        "last_name": _pick_column(columns, "last_name", "lastname", "surname"),
-        "wealth_score": _pick_column(columns, "wealth_score", "wealthscore"),
+        "total_gifts": COL_TOTAL_GIFTS,
+        "average_gift": COL_AVG_GIFT,
+        "wealth_score": COL_WEALTH,
+        "last_gift_date": COL_LAST_GIFT,
+        "contact_created_date": COL_CREATED,
     }
-
-    actual_sort_col = sort_map.get(sort_by) or sort_map["total_gifts"]
-    if not actual_sort_col:
-        raise RuntimeError("Could not find a valid sort column in contacts table.")
-
-    sort_order = "DESC" if sort_order.lower() == "desc" else "ASC"
+    order_col = sort_map.get(sort_by, COL_TOTAL_GIFTS)
+    order_dir = "DESC" if sort_order.lower() == "desc" else "ASC"
     limit = max(1, min(int(limit), 50))
 
     conditions = []
     params = []
 
-    if state and state_col:
-        conditions.append(f"{state_col} = ?")
-        params.append(state.upper())
+    if zip_code:
+        conditions.append(f"{COL_ZIP} = ?")
+        params.append(str(zip_code))
 
-    if city and city_col:
-        conditions.append(f"LOWER({city_col}) = LOWER(?)")
-        params.append(city)
-
-    if donor_status and donor_status_col:
-        conditions.append(f"{donor_status_col} = ?")
+    if donor_status:
+        conditions.append(f"{COL_DONOR_STATUS} = ?")
         params.append(donor_status)
 
-    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
     sql = f"""
-        SELECT *
-        FROM contacts
+        SELECT
+            {COL_CONTACT_ID} AS contact_id,
+            {COL_ZIP} AS zip_code,
+            {COL_FIRST_GIFT} AS first_gift_date,
+            {COL_LAST_GIFT} AS last_gift_date,
+            {COL_AVG_GIFT} AS average_gift,
+            {COL_TOTAL_GIFTS} AS total_gifts,
+            {COL_NUM_GIFTS} AS total_number_of_gifts,
+            {COL_DONOR_STATUS} AS donor_status,
+            {COL_CREATED} AS contact_created_date,
+            {COL_SUB_TYPE} AS subscription_type,
+            {COL_SUB_STATUS} AS subscription_status,
+            {COL_EMAIL_OPEN} AS email_open_rate,
+            {COL_LAST_CLICK} AS last_email_click_date,
+            {COL_EVENT_COUNT} AS event_attendance_count,
+            {COL_GIVING_VEHICLE} AS giving_vehicle,
+            {COL_WEALTH} AS wealth_score
+        FROM "{table}"
         {where_clause}
-        ORDER BY {actual_sort_col} {sort_order}
+        ORDER BY {order_col} {order_dir}
         LIMIT ?
     """
     params.append(limit)
@@ -96,96 +125,77 @@ def search_donors(
         rows = conn.execute(sql, params).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {
-        "results": results,
-        "count": len(results),
-        "summary": f"Found {len(results)} donors."
-    }
+    return {"results": results, "count": len(results), "summary": f"Found {len(results)} donors."}
 
 
 def get_donor_detail(contact_id: str) -> dict:
-    columns = _get_contact_columns()
-    contact_id_col = _require_column(columns, "contact_id", "contactid", "id")
-
+    table = _get_table_name()
     with get_db_connection() as conn:
         row = conn.execute(
-            f"SELECT * FROM contacts WHERE {contact_id_col} = ?",
+            f'SELECT * FROM "{table}" WHERE {COL_CONTACT_ID} = ?',
             (contact_id,),
         ).fetchone()
 
     if row is None:
         return {"results": [], "count": 0, "summary": "No donor found."}
 
-    return {
-        "results": [dict(row)],
-        "count": 1,
-        "summary": "Found donor detail."
-    }
+    return {"results": [dict(row)], "count": 1, "summary": "Found donor detail."}
 
 
 def get_summary_statistics(group_by: Optional[str] = None) -> dict:
-    columns = _get_contact_columns()
+    table = _get_table_name()
 
-    allowed_group_by = {
-        "state": _pick_column(columns, "state", "state_code", "province", "region"),
-        "donor_status": _pick_column(columns, "donor_status", "status", "donorstatus"),
-        "giving_vehicle": _pick_column(columns, "giving_vehicle", "givingvehicle"),
-        "subscription_status": _pick_column(columns, "subscription_status", "subscriptionstatus"),
+    group_map = {
+        "donor_status": COL_DONOR_STATUS,
+        "subscription_type": COL_SUB_TYPE,
+        "subscription_status": COL_SUB_STATUS,
+        "giving_vehicle": COL_GIVING_VEHICLE,
     }
 
-    total_gifts_col = _require_column(columns, "total_gifts", "totalgifts", "lifetime_giving")
-    average_gift_col = _pick_column(columns, "average_gift", "averagegift")
-
     with get_db_connection() as conn:
-        group_col = allowed_group_by.get(group_by)
-        if group_col:
+        if group_by in group_map:
+            group_col = group_map[group_by]
             rows = conn.execute(
                 f"""
                 SELECT
                     {group_col} AS group_value,
                     COUNT(*) AS donor_count,
-                    COALESCE(SUM({total_gifts_col}), 0) AS total_giving
-                FROM contacts
+                    COALESCE(SUM({COL_TOTAL_GIFTS}), 0) AS total_giving
+                FROM "{table}"
                 GROUP BY {group_col}
-                ORDER BY donor_count DESC
+                ORDER BY donor_count DESC, total_giving DESC
                 """
             ).fetchall()
         else:
-            avg_gift_sql = f"COALESCE(AVG({average_gift_col}), 0) AS avg_gift" if average_gift_col else "0 AS avg_gift"
             rows = conn.execute(
                 f"""
                 SELECT
                     COUNT(*) AS donor_count,
-                    COALESCE(SUM({total_gifts_col}), 0) AS total_giving,
-                    COALESCE(AVG({total_gifts_col}), 0) AS avg_total_giving,
-                    {avg_gift_sql}
-                FROM contacts
+                    COALESCE(SUM({COL_TOTAL_GIFTS}), 0) AS total_giving,
+                    COALESCE(AVG({COL_TOTAL_GIFTS}), 0) AS avg_total_giving,
+                    COALESCE(AVG({COL_AVG_GIFT}), 0) AS avg_gift,
+                    COALESCE(AVG({COL_WEALTH}), 0) AS avg_wealth_score
+                FROM "{table}"
                 """
             ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {
-        "results": results,
-        "count": len(results),
-        "summary": "Summary statistics generated."
-    }
+    return {"results": results, "count": len(results), "summary": "Summary statistics generated."}
 
 
 def get_geographic_distribution(limit: int = 50) -> dict:
-    columns = _get_contact_columns()
-    state_col = _require_column(columns, "state", "state_code", "province", "region")
-    total_gifts_col = _require_column(columns, "total_gifts", "totalgifts", "lifetime_giving")
+    table = _get_table_name()
     limit = max(1, min(int(limit), 100))
 
     with get_db_connection() as conn:
         rows = conn.execute(
             f"""
             SELECT
-                {state_col} AS state,
+                {COL_ZIP} AS zip_code,
                 COUNT(*) AS donor_count,
-                COALESCE(SUM({total_gifts_col}), 0) AS total_giving
-            FROM contacts
-            GROUP BY {state_col}
+                COALESCE(SUM({COL_TOTAL_GIFTS}), 0) AS total_giving
+            FROM "{table}"
+            GROUP BY {COL_ZIP}
             ORDER BY donor_count DESC, total_giving DESC
             LIMIT ?
             """,
@@ -193,88 +203,64 @@ def get_geographic_distribution(limit: int = 50) -> dict:
         ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": "Geographic distribution generated."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": "ZIP/postal-code distribution generated.",
+    }
 
 
 def get_lapsed_donors(limit: int = 50) -> dict:
-    columns = _get_contact_columns()
-    donor_status_col = _require_column(columns, "donor_status", "status", "donorstatus")
-    total_gifts_col = _require_column(columns, "total_gifts", "totalgifts", "lifetime_giving")
+    table = _get_table_name()
     limit = max(1, min(int(limit), 100))
 
     with get_db_connection() as conn:
         rows = conn.execute(
             f"""
             SELECT *
-            FROM contacts
-            WHERE {donor_status_col} = 'lapsed'
-            ORDER BY {total_gifts_col} DESC
+            FROM "{table}"
+            WHERE {COL_DONOR_STATUS} = 'lapsed'
+            ORDER BY {COL_TOTAL_GIFTS} DESC, {COL_WEALTH} DESC
             LIMIT ?
             """,
             (limit,),
-        ).fetchall()
-
-    results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": f"Found {len(results)} lapsed donors."}
-
-
-def get_prospects_by_potential(limit: int = 50) -> dict:
-    columns = _get_contact_columns()
-    donor_status_col = _require_column(columns, "donor_status", "status", "donorstatus")
-    wealth_score_col = _require_column(columns, "wealth_score", "wealthscore")
-    event_col = _pick_column(columns, "event_attendance_count", "eventattendancecount")
-    limit = max(1, min(int(limit), 100))
-
-    order_sql = wealth_score_col
-    if event_col:
-        order_sql = f"{wealth_score_col} DESC, {event_col} DESC"
-    else:
-        order_sql = f"{wealth_score_col} DESC"
-
-    with get_db_connection() as conn:
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM contacts
-            WHERE {donor_status_col} = 'prospect'
-            ORDER BY {order_sql}
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
-
-    results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": f"Found {len(results)} prospects."}
-
-
-def plan_fundraising_trip(target_state: str, limit: int = 20) -> dict:
-    columns = _get_contact_columns()
-    state_col = _require_column(columns, "state", "state_code", "province", "region")
-    total_gifts_col = _require_column(columns, "total_gifts", "totalgifts", "lifetime_giving")
-    wealth_score_col = _pick_column(columns, "wealth_score", "wealthscore")
-    limit = max(1, min(int(limit), 100))
-
-    if wealth_score_col:
-        order_sql = f"{total_gifts_col} DESC, {wealth_score_col} DESC"
-    else:
-        order_sql = f"{total_gifts_col} DESC"
-
-    with get_db_connection() as conn:
-        rows = conn.execute(
-            f"""
-            SELECT *
-            FROM contacts
-            WHERE {state_col} = ?
-            ORDER BY {order_sql}
-            LIMIT ?
-            """,
-            (target_state.upper(), limit),
         ).fetchall()
 
     results = _rows_to_dicts(rows)
     return {
         "results": results,
         "count": len(results),
-        "summary": f"Found {len(results)} donors for a {target_state.upper()} trip."
+        "summary": f"Found {len(results)} lapsed donors.",
     }
 
+
+def get_prospects_by_potential(limit: int = 50) -> dict:
+    table = _get_table_name()
+    limit = max(1, min(int(limit), 100))
+
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM "{table}"
+            WHERE {COL_DONOR_STATUS} = 'prospect'
+            ORDER BY {COL_WEALTH} DESC, {COL_EMAIL_OPEN} DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    results = _rows_to_dicts(rows)
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": f"Found {len(results)} prospects.",
+    }
+
+
+def plan_fundraising_trip(target_state: str, limit: int = 20) -> dict:
+    return {
+        "results": [],
+        "count": 0,
+        "summary": "Trip-by-state is unavailable because this dataset has ZIP/postal code but no state field.",
+    }
