@@ -39,9 +39,13 @@ def inject_css() -> None:
             --border: #d8deea;
             --text: #172033;
             --muted: #65708a;
-            --accent: #27314a;
-            --accent-soft: #e9edf7;
+            --accent: #24324a;
+            --accent-hover: #1c273b;
             --chip: #eef2f8;
+            --sidebar-bg: #0f1728;
+            --sidebar-border: #1f2a40;
+            --sidebar-text: #ffffff;
+            --sidebar-muted: #d1d8e8;
         }
 
         html, body, [class*="css"] {
@@ -54,8 +58,18 @@ def inject_css() -> None:
         }
 
         [data-testid="stSidebar"] {
-            background: var(--panel);
-            border-right: 1px solid var(--border);
+            background: var(--sidebar-bg) !important;
+            border-right: 1px solid var(--sidebar-border);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: var(--sidebar-text) !important;
+        }
+
+        [data-testid="stSidebar"] .stCaption,
+        [data-testid="stSidebar"] small,
+        [data-testid="stSidebar"] .small-muted {
+            color: var(--sidebar-muted) !important;
         }
 
         .block-container {
@@ -90,8 +104,7 @@ def inject_css() -> None:
         div[data-testid="stTextInput"] input,
         textarea,
         input,
-        div[data-baseweb="select"] > div,
-        div[data-testid="stFileUploader"] section {
+        div[data-baseweb="select"] > div {
             background: var(--panel) !important;
             color: var(--text) !important;
             border: 1px solid var(--border) !important;
@@ -99,11 +112,26 @@ def inject_css() -> None:
             box-shadow: none !important;
         }
 
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input,
+        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
+            background: #162033 !important;
+            color: var(--sidebar-text) !important;
+            border: 1px solid #31415f !important;
+        }
+
         div[data-testid="stTextInput"] input:focus,
         textarea:focus,
         input:focus {
             border: 1px solid #9aa8c6 !important;
             box-shadow: 0 0 0 1px #9aa8c6 !important;
+            outline: none !important;
+        }
+
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus,
+        [data-testid="stSidebar"] textarea:focus,
+        [data-testid="stSidebar"] input:focus {
+            border: 1px solid #5e7398 !important;
+            box-shadow: 0 0 0 1px #5e7398 !important;
             outline: none !important;
         }
 
@@ -115,8 +143,8 @@ def inject_css() -> None:
         }
 
         div[data-testid="stButton"] button:hover {
-            background: #1c2538 !important;
-            border-color: #1c2538 !important;
+            background: var(--accent-hover) !important;
+            border-color: var(--accent-hover) !important;
         }
 
         div[data-testid="stChatInput"] {
@@ -135,10 +163,15 @@ def inject_css() -> None:
         }
 
         .usage-box {
-            border: 1px solid var(--border);
+            border: 1px solid #31415f;
             border-radius: 14px;
             padding: 0.9rem 1rem;
-            background: var(--panel);
+            background: #162033;
+            color: var(--sidebar-text);
+        }
+
+        .usage-box div {
+            color: var(--sidebar-text) !important;
         }
 
         .model-chip {
@@ -152,23 +185,15 @@ def inject_css() -> None:
             margin-bottom: 0.75rem;
         }
 
-        .attach-box {
-            border: 1px dashed var(--border);
-            border-radius: 14px;
-            padding: 0.5rem 0.8rem 0.25rem 0.8rem;
-            background: var(--panel-2);
-            margin-bottom: 0.75rem;
-        }
-
-        .small-muted {
-            color: var(--muted);
-            font-size: 0.84rem;
-        }
-
         [data-testid="stExpander"] {
             border: 1px solid var(--border) !important;
             border-radius: 14px !important;
             background: var(--panel) !important;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            border: 1px solid #31415f !important;
+            background: #162033 !important;
         }
         </style>
         """,
@@ -335,11 +360,50 @@ def session_spend_and_remaining() -> tuple[float, float]:
     return spent, remaining
 
 
+def parse_chat_submission(submission) -> tuple[str, list]:
+    if submission is None:
+        return "", []
+
+    if isinstance(submission, str):
+        return submission.strip(), []
+
+    text = ""
+    files = []
+
+    try:
+        text = submission.text or ""
+    except Exception:
+        try:
+            text = submission.get("text", "")
+        except Exception:
+            text = ""
+
+    try:
+        files = list(submission.files or [])
+    except Exception:
+        try:
+            files = list(submission.get("files", []) or [])
+        except Exception:
+            files = []
+
+    return text.strip(), files
+
+
 ensure_state()
 inject_css()
 state_options = get_state_options()
 
 with st.sidebar:
+    selected_model = st.selectbox(
+        "Model",
+        list(AVAILABLE_MODELS.keys()),
+        format_func=lambda x: AVAILABLE_MODELS[x],
+        index=list(AVAILABLE_MODELS.keys()).index(
+            st.session_state.get("selected_model", DEFAULT_MODEL)
+        ),
+    )
+    st.session_state["selected_model"] = selected_model
+
     st.text_input(
         "Search",
         key="thread_search",
@@ -367,23 +431,12 @@ with st.sidebar:
     else:
         for thread_item in visible_threads:
             label = thread_item["title"] or "Untitled thread"
-            if thread_item["id"] == st.session_state.active_thread_id:
-                label = "• " + label
-            if st.button(label, key=f"thread_{thread_item['id']}", use_container_width=True):
+            prefix = "• " if thread_item["id"] == st.session_state.active_thread_id else ""
+            if st.button(f"{prefix}{label}", key=f"thread_{thread_item['id']}", use_container_width=True):
                 st.session_state.active_thread_id = thread_item["id"]
                 st.rerun()
 
     st.divider()
-
-    selected_model = st.selectbox(
-        "Model",
-        list(AVAILABLE_MODELS.keys()),
-        format_func=lambda x: AVAILABLE_MODELS[x],
-        index=list(AVAILABLE_MODELS.keys()).index(
-            st.session_state.get("selected_model", DEFAULT_MODEL)
-        ),
-    )
-    st.session_state["selected_model"] = selected_model
 
     st.markdown("#### Quick filters")
     donor_status_filter = st.selectbox(
@@ -455,27 +508,27 @@ st.markdown(
 for message in thread["messages"]:
     render_message(message)
 
-st.markdown('<div class="attach-box">', unsafe_allow_html=True)
-st.markdown('<div class="small-muted">+ Attach files or images</div>', unsafe_allow_html=True)
-uploaded_files = st.file_uploader(
-    "Attach files",
-    accept_multiple_files=True,
-    type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
-    label_visibility="collapsed",
-    key="attachment_uploader",
+submission = st.chat_input(
+    "Ask about your donor community...",
+    accept_file="multiple",
+    file_type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
+    key="main_chat_input",
 )
-st.markdown("</div>", unsafe_allow_html=True)
 
-prompt = st.chat_input("Ask about your donor community...")
+prompt, uploaded_files = parse_chat_submission(submission)
 
-if prompt:
-    attachment_names = [f.name for f in (uploaded_files or [])]
+if prompt or uploaded_files:
+    attachment_names = [f.name for f in uploaded_files]
     effective_prompt = build_effective_prompt(prompt, donor_status_filter, state_filter)
 
-    add_message("user", prompt, attachments=attachment_names)
+    user_display = prompt if prompt else "[Files uploaded]"
+    add_message("user", user_display, attachments=attachment_names)
 
     with st.chat_message("user"):
-        st.markdown(prompt)
+        if prompt:
+            st.markdown(prompt)
+        else:
+            st.markdown("[Files uploaded]")
         if attachment_names:
             st.caption("Attached: " + ", ".join(attachment_names))
 
@@ -485,7 +538,7 @@ if prompt:
         try:
             with st.status("Analyzing donor database...", expanded=True) as status:
                 response, usage = get_response(
-                    user_message=effective_prompt,
+                    user_message=effective_prompt if prompt else "Please analyze the attached files if relevant.",
                     conversation_history=thread["messages"][:-1],
                     model=selected_model,
                     session_tracker=st.session_state.tracker,
