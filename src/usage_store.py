@@ -126,7 +126,8 @@ def get_usage_summary(
             COUNT(*) as api_calls,
             COALESCE(SUM(input_tokens), 0) as input_tokens,
             COALESCE(SUM(output_tokens), 0) as output_tokens,
-            COALESCE(SUM(cache_read_input_tokens), 0) as cache_read_tokens
+            COALESCE(SUM(cache_read_input_tokens), 0) as cache_read_tokens,
+            COALESCE(SUM(cache_creation_input_tokens), 0) as cache_write_tokens
         FROM api_calls
         {where}
         GROUP BY model
@@ -146,16 +147,18 @@ def get_usage_summary(
         output_rate = pricing.get("output_per_mtok", 0.0)
 
         cache_read = mr.get("cache_read_tokens", 0) or 0
-        regular_input = (mr.get("input_tokens", 0) or 0) - cache_read
+        cache_write = mr.get("cache_write_tokens", 0) or 0
+        raw_input = mr.get("input_tokens", 0) or 0
+        regular_input = max(0, raw_input - cache_read - cache_write)
 
         total_cost += (regular_input / 1_000_000) * base_rate
+        total_cost += (cache_write / 1_000_000) * base_rate * 1.25
         total_cost += (cache_read / 1_000_000) * base_rate * 0.1
         total_cost += ((mr.get("output_tokens", 0) or 0) / 1_000_000) * output_rate
 
     result["estimated_total_cost_usd"] = round(total_cost, 4)
-    result["note"] = (
-        "These are rough in-app estimates based on the local pricing table."
-    )
+    result["note"] = "These are rough in-app estimates based on the local pricing table."
 
     conn.close()
     return result
+
