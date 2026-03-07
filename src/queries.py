@@ -54,6 +54,27 @@ def _get_table_name() -> str:
     return rows[0]["name"]
 
 
+def _select_donor_fields() -> str:
+    return f"""
+        {COL_CONTACT_ID} AS contact_id,
+        {COL_ZIP} AS zip_code,
+        {COL_FIRST_GIFT} AS first_gift_date,
+        {COL_LAST_GIFT} AS last_gift_date,
+        {COL_AVG_GIFT} AS average_gift,
+        {COL_TOTAL_GIFTS} AS total_gifts,
+        {COL_NUM_GIFTS} AS total_number_of_gifts,
+        {COL_DONOR_STATUS} AS donor_status,
+        {COL_CREATED} AS contact_created_date,
+        {COL_SUB_TYPE} AS subscription_type,
+        {COL_SUB_STATUS} AS subscription_status,
+        {COL_EMAIL_OPEN} AS email_open_rate,
+        {COL_LAST_CLICK} AS last_email_click_date,
+        {COL_EVENT_COUNT} AS event_attendance_count,
+        {COL_GIVING_VEHICLE} AS giving_vehicle,
+        {COL_WEALTH} AS wealth_score
+    """
+
+
 def search_donors(
     state: Optional[str] = None,
     city: Optional[str] = None,
@@ -70,6 +91,13 @@ def search_donors(
             "results": [],
             "count": 0,
             "summary": "This dataset does not include a state field. Try filtering by ZIP/postal code instead.",
+        }
+
+    if city:
+        return {
+            "results": [],
+            "count": 0,
+            "summary": "This dataset does not include a city field. Try filtering by ZIP/postal code instead.",
         }
 
     sort_map = {
@@ -98,22 +126,7 @@ def search_donors(
 
     sql = f"""
         SELECT
-            {COL_CONTACT_ID} AS contact_id,
-            {COL_ZIP} AS zip_code,
-            {COL_FIRST_GIFT} AS first_gift_date,
-            {COL_LAST_GIFT} AS last_gift_date,
-            {COL_AVG_GIFT} AS average_gift,
-            {COL_TOTAL_GIFTS} AS total_gifts,
-            {COL_NUM_GIFTS} AS total_number_of_gifts,
-            {COL_DONOR_STATUS} AS donor_status,
-            {COL_CREATED} AS contact_created_date,
-            {COL_SUB_TYPE} AS subscription_type,
-            {COL_SUB_STATUS} AS subscription_status,
-            {COL_EMAIL_OPEN} AS email_open_rate,
-            {COL_LAST_CLICK} AS last_email_click_date,
-            {COL_EVENT_COUNT} AS event_attendance_count,
-            {COL_GIVING_VEHICLE} AS giving_vehicle,
-            {COL_WEALTH} AS wealth_score
+            {_select_donor_fields()}
         FROM "{table}"
         {where_clause}
         ORDER BY {order_col} {order_dir}
@@ -125,14 +138,23 @@ def search_donors(
         rows = conn.execute(sql, params).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": f"Found {len(results)} donors."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": f"Found {len(results)} donors.",
+    }
 
 
 def get_donor_detail(contact_id: str) -> dict:
     table = _get_table_name()
     with get_db_connection() as conn:
         row = conn.execute(
-            f'SELECT * FROM "{table}" WHERE {COL_CONTACT_ID} = ?',
+            f"""
+            SELECT
+                {_select_donor_fields()}
+            FROM "{table}"
+            WHERE {COL_CONTACT_ID} = ?
+            """,
             (contact_id,),
         ).fetchone()
 
@@ -180,7 +202,11 @@ def get_summary_statistics(group_by: Optional[str] = None) -> dict:
             ).fetchall()
 
     results = _rows_to_dicts(rows)
-    return {"results": results, "count": len(results), "summary": "Summary statistics generated."}
+    return {
+        "results": results,
+        "count": len(results),
+        "summary": "Summary statistics generated.",
+    }
 
 
 def get_geographic_distribution(limit: int = 50) -> dict:
@@ -217,7 +243,8 @@ def get_lapsed_donors(limit: int = 50) -> dict:
     with get_db_connection() as conn:
         rows = conn.execute(
             f"""
-            SELECT *
+            SELECT
+                {_select_donor_fields()}
             FROM "{table}"
             WHERE {COL_DONOR_STATUS} = 'lapsed'
             ORDER BY {COL_TOTAL_GIFTS} DESC, {COL_WEALTH} DESC
@@ -241,7 +268,8 @@ def get_prospects_by_potential(limit: int = 50) -> dict:
     with get_db_connection() as conn:
         rows = conn.execute(
             f"""
-            SELECT *
+            SELECT
+                {_select_donor_fields()}
             FROM "{table}"
             WHERE {COL_DONOR_STATUS} = 'prospect'
             ORDER BY {COL_WEALTH} DESC, {COL_EMAIL_OPEN} DESC
@@ -264,3 +292,4 @@ def plan_fundraising_trip(target_state: str, limit: int = 20) -> dict:
         "count": 0,
         "summary": "Trip-by-state is unavailable because this dataset has ZIP/postal code but no state field.",
     }
+
