@@ -10,7 +10,20 @@ from pathlib import Path
 import streamlit as st
 import uuid
 
-# 1. Path & Import Setup
+# Auto-initialize the donor database if it does not exist.
+# This runs on first startup in Streamlit Cloud and GitHub Codespaces.
+import importlib.util
+
+_db_path = Path(__file__).parent.parent / "data" / "donors.db"
+if not _db_path.exists():
+    _gen_path = Path(__file__).parent.parent / "data" / "generate_mock_data.py"
+    spec = importlib.util.spec_from_file_location("generate_mock_data", _gen_path)
+    _gen = importlib.util.module_from_spec(spec)
+    _gen.__file__ = str(_gen_path)  # ensures Path(__file__).parent resolves correctly inside the script
+    spec.loader.exec_module(_gen)
+    _gen.main()  # main() only runs under __name__ == "__main__", so call it explicitly
+
+# Add src to path for imports so this works regardless of where streamlit is launched
 sys.path.insert(0, str(Path(__file__).parent))
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL, DB_PATH
 from llm import get_response

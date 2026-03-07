@@ -1,6 +1,8 @@
 # IASC Donor Analytics
 
-An AI-powered donor intelligence prototype for the Institute for Advanced Studies in Culture (IASC), a nonprofit research center and publisher at the University of Virginia. The tool lets IASC's development team ask natural language questions about their donor database — "Which lapsed donors in Virginia gave more than $5,000?", "Plan a fundraising trip to NYC", "Who are our highest-potential prospects?" — and receive data-grounded, actionable answers. Claude (Anthropic) handles intent parsing and response synthesis; Python functions query a SQLite database and return structured results; a curated knowledge base of fundraising best practices is injected into the system prompt so every answer is informed by domain expertise.
+An AI-powered donor intelligence prototype for the Institute for Advanced Studies in Culture (IASC), a nonprofit research center and publisher at the University of Virginia. The tool lets a development team ask natural language questions about their donor database — "Which lapsed donors in Virginia gave more than $5,000?", "Plan a fundraising trip to NYC", "Who are our highest-potential prospects?" — and receive data-grounded, actionable answers. Claude (Anthropic) handles intent parsing and response synthesis; Python functions query a SQLite database and return structured results; a curated knowledge base of fundraising best practices is injected into the system prompt so every answer is informed by domain expertise.
+
+> **This repository uses entirely synthetic data.** The donor database is generated procedurally by `data/generate_mock_data.py` and contains no real names, contact information, giving history, or any other actual IASC data. No real donor data has ever been committed to this repository.
 
 ---
 
@@ -25,6 +27,33 @@ streamlit run src/app.py
 ```
 
 The app will open in your browser at `http://localhost:8501`.
+
+---
+
+## Running in GitHub Codespaces (no local setup required)
+
+1. Click the green **Code** button on the repo page, then **Codespaces > New codespace**.
+2. Wait for the environment to build (about 2 minutes the first time).
+3. Add your Anthropic API key as a Codespaces secret: go to github.com > Settings > Codespaces > Secrets,
+   create a secret named `ANTHROPIC_API_KEY`, and set its value to your key. Grant it access to this repo.
+4. In the Codespace terminal, run: `streamlit run src/app.py`
+5. When prompted, click **Open in Browser** to view the app.
+
+The mock database is generated automatically during environment setup.
+You do not need to run `generate_mock_data.py` manually.
+
+## Deploying to Streamlit Community Cloud
+
+1. Fork this repo to your own GitHub account.
+2. Go to share.streamlit.io and connect your GitHub account.
+3. Create a new app, pointing to `src/app.py` in your fork.
+4. Under **Advanced settings > Secrets**, paste the contents of `.streamlit/secrets.toml.example`
+   and replace the placeholder with your real API key.
+5. Click **Deploy**. The mock database will be generated automatically on first startup.
+
+Note: do not use real donor data with this deployment. The app has no authentication.
+
+**To rotate the API key after initial deployment:** go to https://share.streamlit.io, find the app, click the three-dot menu (⋮) on the right > **Settings** > **Secrets**, and update the value to the new key in the format `ANTHROPIC_API_KEY = "sk-ant-..."`  . The app will restart automatically.
 
 ---
 

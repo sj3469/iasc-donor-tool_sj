@@ -16,11 +16,15 @@ BASE_DIR = Path(__file__).parent
 CSV_PATH = BASE_DIR / "mock_dataset3.csv"
 DB_PATH = BASE_DIR / "donors.db"
 
-# 4. API Key Resolution (Web vs Local)
-# This looks for the label "GEMINI_API_KEY" in your Streamlit Secrets Dashboard.
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+# API configuration
+try:
+    import streamlit as st
+    ANTHROPIC_API_KEY = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+except Exception:
+    ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
-# 5. Model Settings
+# Model configuration
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 AVAILABLE_MODELS = {
     "gemini-2.0-flash": "Gemini 2.0 Flash (Fastest)",
     "gemini-1.5-pro": "Gemini 1.5 Pro (Most Capable)",
