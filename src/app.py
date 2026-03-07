@@ -1,5 +1,4 @@
 import streamlit as st
-import os
 
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
 from llm import get_response
@@ -7,12 +6,8 @@ from token_tracker import SessionTracker
 from usage_store import get_usage_summary
 
 
-
-
-# 1. Page Configuration [Restores your missing titles]
 st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
 
-# 2. Initialize Session States
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "tracker" not in st.session_state:
@@ -32,7 +27,7 @@ with st.sidebar:
     st.divider()
 
     st.markdown("### 📁 Data Source")
-    st.info("Connected: `mock_dataset3.csv`")
+    st.info("Connected: `donors.db`")
 
     st.markdown("### 📊 Session Usage")
     st.markdown(st.session_state.tracker.format_sidebar())
@@ -62,6 +57,8 @@ with st.sidebar:
         index=0,
     )
 
+    st.caption("Quick filters are currently for reference in the interface.")
+
     st.divider()
 
     st.markdown("### ❓ Frequently Asked Questions")
@@ -76,14 +73,13 @@ with st.sidebar:
 
     with st.expander("Why are some answers short?"):
         st.markdown(
-            "Some query tools are still basic stubs, so results may be limited "
-            "until more query functions are fully implemented."
+            "Some database helper functions are still intentionally lightweight, "
+            "so certain answers may be simpler than the final production version."
         )
 
     with st.expander("Why might usage stats look odd?"):
         st.markdown(
-            "Your tracker and usage storage were originally written around a different "
-            "pricing setup, so cost estimates may need updating."
+            "Usage and cost estimates are approximate and depend on the local pricing configuration."
         )
 
     st.divider()
@@ -93,41 +89,47 @@ with st.sidebar:
         st.rerun()
 
 
-# 4. Main UI Header [Fixes the blank screen issue]
 st.title(APP_TITLE)
 st.subheader(APP_SUBTITLE)
 
-# 5. Chat Interface
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+
 if prompt := st.chat_input("Ask about your donor community..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
+
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
-        with st.status("Analyzing IASC database...", expanded=True) as status:
-            response, usage = get_response(
-                user_message=prompt,
-                conversation_history=st.session_state.messages[:-1],
-                model=selected_model,
-                session_tracker=st.session_state.tracker
-            )
-            status.update(label="Analysis Complete!", state="complete", expanded=False)
-        
-        response_placeholder.markdown(response)
 
         try:
-            st.caption(
-                f"Model: {selected_model} | "
-                f"Prompt tokens: {getattr(usage, 'prompt_token_count', 0)} | "
-                f"Output tokens: {getattr(usage, 'candidates_token_count', 0)}"
-            )
-        except Exception:
-            pass
-        
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            with st.status("Analyzing IASC database...", expanded=True) as status:
+                response, usage = get_response(
+                    user_message=prompt,
+                    conversation_history=st.session_state.messages[:-1],
+                    model=selected_model,
+                    session_tracker=st.session_state.tracker,
+                )
+                status.update(label="Analysis Complete!", state="complete", expanded=False)
+
+            response_placeholder.markdown(response)
+
+            try:
+                st.caption(
+                    f"Model: {selected_model} | "
+                    f"Prompt tokens: {getattr(usage, 'prompt_token_count', 0)} | "
+                    f"Output tokens: {getattr(usage, 'candidates_token_count', 0)}"
+                )
+            except Exception:
+                pass
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+        except Exception as e:
+            st.error(f"Request failed: {e}")
+
 
