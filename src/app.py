@@ -4,7 +4,8 @@ import os
 # Internal project imports
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
 from llm import get_response
-from token_tracker import SessionTokenTracker
+from token_tracker import SessionTracker
+
 
 # 1. Page Configuration [Restores your missing titles]
 st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
