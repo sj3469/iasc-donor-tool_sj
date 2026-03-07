@@ -21,7 +21,9 @@ AVAILABLE_MODELS = {
     "gemini-2.0-flash": "Gemini 2.0 Flash (Fastest)",
     "gemini-1.5-pro": "Gemini 1.5 Pro (Most Capable)",
 }
+
 DEFAULT_MODEL = "gemini-2.0-flash"
 
 if GEMINI_API_KEY:
     os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+
