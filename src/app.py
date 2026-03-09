@@ -3,8 +3,8 @@ import os
 import sys
 from pathlib import Path
 
-# --- THE IMPORT BRIDGE ---
-# This forces Streamlit to see your other files like token_tracker.py
+# --- THE PATH BRIDGE [CRITICAL FIX] ---
+# This ensures Streamlit sees all files in your 'src' folder
 current_dir = Path(__file__).parent
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
@@ -14,7 +14,7 @@ from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
 from llm import get_response
 from token_tracker import SessionTokenTracker
 
-# 1. Page Configuration
+# 1. Page Configuration [Restores missing titles]
 st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
 
 # 2. Initialize Session States
@@ -41,7 +41,7 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# 4. Main UI Header [Restores your missing titles]
+# 4. Main UI Header [Restores your missing text]
 st.title(APP_TITLE)
 st.subheader(APP_SUBTITLE)
 
