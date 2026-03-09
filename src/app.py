@@ -3,10 +3,13 @@ import os
 import sys
 from pathlib import Path
 
-# Add the current directory to the system path to fix ImportErrors
-sys.path.append(str(Path(__file__).parent))
+# --- THE IMPORT FIX ---
+# This tells Streamlit to look in the 'src' folder for your other files
+current_dir = Path(__file__).parent
+if str(current_dir) not in sys.path:
+    sys.path.append(str(current_dir))
 
-# Now import project files
+# Now these imports will finally work
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
 from llm import get_response
 from token_tracker import SessionTokenTracker
