@@ -18,21 +18,22 @@ def get_response(
     
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     
-    # Define Tools
+    # Register tools from queries.py
     tools = [search_donors, get_donor_detail, get_summary_statistics,
              get_geographic_distribution, get_lapsed_donors,
              get_prospects_by_potential, plan_fundraising_trip]
 
-    # Convert Prompt to String
+    # Clean system instructions to prevent validation errors
     raw_prompt = build_system_prompt()
     system_text = " ".join([p.get("text", "") if isinstance(p, dict) else str(p) for p in raw_prompt]) if isinstance(raw_prompt, list) else str(raw_prompt)
 
     prompt_content = [user_message]
     if attachment:
-        # Note: In production, save uploader to temp file first
-        prompt_content.append(attachment.getvalue().decode("utf-8") if attachment.type == 'text/csv' else "File attached")
+        # Simple text handling for the uploaded file content
+        file_content = attachment.getvalue().decode("utf-8", errors="ignore")
+        prompt_content.append(f"\n\nAdditional File Context:\n{file_content}")
 
-    # FIXED: Simplified config to prevent ClientError
+    # Simplified config to prevent the ClientError
     response = client.models.generate_content(
         model=model,
         contents=prompt_content,
