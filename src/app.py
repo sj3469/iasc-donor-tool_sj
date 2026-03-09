@@ -77,15 +77,26 @@ def inject_css() -> None:
         [data-testid="stAppViewContainer"] { background-color: var(--main-bg) !important; }
         [data-testid="stAppViewContainer"] h1, 
         [data-testid="stAppViewContainer"] h2, 
-        [data-testid="stAppViewContainer"] h3, 
-        [data-testid="stAppViewContainer"] p, 
-        [data-testid="stAppViewContainer"] span { color: var(--main-text) !important; }
+        [data-testid="stAppViewContainer"] h3 { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* 2. Top Navbar (Clean Grey Icons on White Background) */
-        header[data-testid="stHeader"] { background: transparent !important; }
-        header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg, header[data-testid="stHeader"] span {
-            color: #6b7280 !important; fill: #6b7280 !important;
+        /* 🔥 FIX: Force Chat Messages to be Dark Text */
+        [data-testid="stChatMessageContent"] p, 
+        [data-testid="stChatMessageContent"] span, 
+        [data-testid="stChatMessageContent"] li, 
+        [data-testid="stChatMessageContent"] div {
+            color: var(--main-text) !important;
+        }
+
+        /* 2. Top Navbar (Dark Background, White Icons) */
+        header[data-testid="stHeader"] { 
+            background-color: var(--sidebar-bg) !important; 
+        }
+        header[data-testid="stHeader"] button, 
+        header[data-testid="stHeader"] svg, 
+        header[data-testid="stHeader"] span {
+            color: #ffffff !important; 
+            fill: #ffffff !important;
         }
 
         /* 3. Sidebar Styling (Force Dark Background & Bright Text) */
@@ -96,7 +107,8 @@ def inject_css() -> None:
         [data-testid="stSidebar"] * { 
             color: var(--sidebar-text) !important; 
         }
-        /* Sidebar Inputs */
+        
+        /* Sidebar Inputs & Dropdowns */
         [data-testid="stSidebar"] div[data-baseweb="select"] > div,
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
@@ -104,6 +116,14 @@ def inject_css() -> None:
             color: var(--sidebar-text) !important;
             border-radius: 8px;
             -webkit-text-fill-color: var(--sidebar-text) !important;
+        }
+        
+        /* Fix Dropdown Menu Popups in Sidebar */
+        [data-testid="stSidebar"] ul[data-baseweb="menu"] {
+            background-color: #12182b !important;
+        }
+        [data-testid="stSidebar"] ul[data-baseweb="menu"] li {
+            color: var(--sidebar-text) !important;
         }
 
         /* 4. Bottom Chat Area (Force absolute white background) */
@@ -159,13 +179,14 @@ def inject_css() -> None:
             color: var(--accent-blue) !important;
         }
         
-        /* 7. Download Button */
-        .stDownloadButton button {
-            background-color: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
+        /* 7. Download Button & Clear Chat */
+        .stDownloadButton button, [data-testid="stSidebar"] div[data-testid="stButton"] button {
+            background-color: transparent !important;
+            border: 1px solid var(--sidebar-border) !important;
             border-radius: 8px !important;
         }
         .stDownloadButton button p { color: #111827 !important; }
+        .stDownloadButton button { border: 1px solid #e5e7eb !important; background-color: #ffffff !important; }
         </style>
         """,
         unsafe_allow_html=True
@@ -180,29 +201,38 @@ if "tracker" not in st.session_state:
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Reorganized & Cleaned Up) ---
 with st.sidebar:
-    selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
+    # 1. Search at the very top (Collapse icon is natively above this)
     st.text_input("Search", placeholder="🔍 Search threads...", label_visibility="collapsed")
+    
+    # 2. Model Selection
+    selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
     
     st.divider()
     
-    st.markdown("### Quick Filters")
+    # 3. Quick Filters
+    st.markdown("<h4 style='color: #ffffff;'>Quick Filters</h4>", unsafe_allow_html=True)
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
     
-    for _ in range(8):
-        st.write("")
-        
     st.divider()
-    st.markdown("<h4 style='font-size: 14px; font-weight: normal; color: #9aa4bf;'>Settings</h4>", unsafe_allow_html=True)
     
+    # 4. Session Usage (Directly below filters)
     tracker_placeholder = st.empty()
     try:
         tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
     except Exception:
         pass 
         
+    # Spacer to push settings to the absolute bottom
+    for _ in range(10):
+        st.write("")
+        
+    st.divider()
+    
+    # 5. Settings (Minimal, no emoji, at the bottom)
+    st.markdown("<div style='font-size: 14px; color: #ffffff; padding-bottom: 8px;'>Settings</div>", unsafe_allow_html=True)
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
