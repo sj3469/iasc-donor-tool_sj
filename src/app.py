@@ -41,13 +41,12 @@ def inject_css() -> None:
             --accent: #24324a;
             --accent-hover: #1c273b;
             --chip: #eef2f8;
-            --navy: #0f1728;
-            --sidebar-bg: #0f1728;
-            --sidebar-border: #25324a;
-            --sidebar-text: #ffffff;
-            --sidebar-line: #eef2f8;
+            --sidebar-bg: #f7f8fb; /* Changed to match main background */
+            --sidebar-border: #d8deea;
+            --sidebar-text: #172033; /* Changed to dark text */
+            --sidebar-line: #e9edf5;
             --soft-line: #e9edf5;
-            --chat-focus: #f4efe6;
+            --focus-grey: #aeb5c7; /* New grey for focus rings */
         }
 
         html, body, [class*="css"] {
@@ -77,13 +76,10 @@ def inject_css() -> None:
             background: var(--bg) !important;
         }
 
-        [data-testid="stHeader"] {
-            background: var(--bg) !important;
-        }
-
         [data-testid="stToolbar"],
         [data-testid="stStatusWidget"] {
-            background: var(--navy) !important;
+            background: var(--panel) !important; /* Changed to light */
+            border: 1px solid var(--border) !important;
             border-radius: 14px !important;
             padding: 0.28rem 0.55rem !important;
             margin-top: 0.35rem !important;
@@ -100,43 +96,34 @@ def inject_css() -> None:
 
         [data-testid="stToolbar"] *,
         [data-testid="stStatusWidget"] * {
-            color: #ffffff !important;
+            color: var(--text) !important; /* Changed to dark */
         }
 
         [data-testid="stToolbar"] button,
         [data-testid="stStatusWidget"] button,
         button[kind="header"],
         button[kind="headerNoPadding"] {
-            color: #ffffff !important;
+            color: var(--text) !important;
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
-        }
-
-        [data-testid="stToolbar"] a,
-        [data-testid="stStatusWidget"] a,
-        [data-testid="stToolbar"] span,
-        [data-testid="stStatusWidget"] span,
-        [data-testid="stToolbar"] div,
-        [data-testid="stStatusWidget"] div {
-            color: #ffffff !important;
         }
 
         [data-testid="stToolbar"] svg,
         [data-testid="stStatusWidget"] svg,
         button[kind="header"] svg,
         button[kind="headerNoPadding"] svg {
-            fill: #ffffff !important;
-            stroke: #ffffff !important;
-            color: #ffffff !important;
+            fill: var(--text) !important; /* Darker icons */
+            stroke: var(--text) !important;
+            color: var(--text) !important;
         }
 
         [data-testid="stToolbar"] svg *,
         [data-testid="stStatusWidget"] svg *,
         button[kind="header"] svg *,
         button[kind="headerNoPadding"] svg * {
-            fill: #ffffff !important;
-            stroke: #ffffff !important;
+            fill: var(--text) !important;
+            stroke: var(--text) !important;
         }
 
         [data-testid="collapsedControl"] {
@@ -146,9 +133,9 @@ def inject_css() -> None:
         [data-testid="collapsedControl"] button,
         [data-testid="collapsedControl"] svg,
         [data-testid="collapsedControl"] svg * {
-            color: #ffffff !important;
-            fill: #ffffff !important;
-            stroke: #ffffff !important;
+            color: var(--text) !important;
+            fill: var(--text) !important;
+            stroke: var(--text) !important;
         }
 
         /* ---------- sidebar ---------- */
@@ -167,48 +154,55 @@ def inject_css() -> None:
             border-top: 1px solid var(--sidebar-line) !important;
         }
 
+        /* Sidebar input fields updated to light mode */
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
-            background: #162033 !important;
-            color: #ffffff !important;
-            border: 1px solid #31415f !important;
+            background: #ffffff !important;
+            color: var(--text) !important;
+            border: 1px solid var(--border) !important;
             border-radius: 14px !important;
             box-shadow: none !important;
         }
 
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input::placeholder {
-            color: #ffffff !important;
+            color: var(--muted) !important;
             opacity: 1 !important;
         }
 
+        /* Grey line on focus */
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus {
-            border: 1px solid #5e7398 !important;
-            box-shadow: 0 0 0 1px #5e7398 !important;
+            border: 1px solid var(--focus-grey) !important;
+            box-shadow: 0 0 0 1px var(--focus-grey) !important;
             outline: none !important;
         }
 
         [data-testid="stSidebar"] div[data-baseweb="select"] > div {
-            background: #162033 !important;
-            color: #ffffff !important;
-            border: 1px solid #31415f !important;
+            background: #ffffff !important;
+            color: var(--text) !important;
+            border: 1px solid var(--border) !important;
             border-radius: 14px !important;
             box-shadow: none !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] {
-            border: 1px solid #31415f !important;
-            background: #162033 !important;
+            border: 1px solid var(--border) !important;
+            background: #ffffff !important;
             border-radius: 14px !important;
+        }
+        
+        [data-testid="stSidebar"] svg {
+            fill: var(--text) !important;
+            color: var(--text) !important;
         }
 
         .usage-box {
-            border: 1px solid #31415f;
+            border: 1px solid var(--border);
             border-radius: 14px;
             padding: 0.9rem 1rem;
-            background: #162033;
+            background: #ffffff;
         }
 
         .usage-box div {
-            color: #ffffff !important;
+            color: var(--text) !important;
         }
 
         /* ---------- main content ---------- */
@@ -277,15 +271,16 @@ def inject_css() -> None:
 
         div[data-testid="stChatInput"] form {
             background: #ffffff !important;
-            border: 1px solid #f3f4f6 !important;
-            border-radius: 20px !important;
+            border: 1px solid #d8deea !important;
+            border-radius: 24px !important; /* Made pill-shaped like Gemini */
             box-shadow: none !important;
-            padding: 0.1rem 0.2rem !important;
+            padding: 0.25rem 0.5rem !important;
         }
 
+        /* Grey line instead of red when clicking/focusing */
         div[data-testid="stChatInput"] form:focus-within {
-            border: 1px solid var(--chat-focus) !important;
-            box-shadow: 0 0 0 2px rgba(244, 239, 230, 0.85) !important;
+            border: 1px solid var(--focus-grey) !important;
+            box-shadow: 0 0 0 1px var(--focus-grey) !important;
         }
 
         div[data-testid="stChatInput"] > div,
@@ -297,7 +292,7 @@ def inject_css() -> None:
 
         div[data-testid="stChatInput"] textarea {
             background: #ffffff !important;
-            color: #5f6675 !important;
+            color: #172033 !important;
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
@@ -319,20 +314,21 @@ def inject_css() -> None:
             background: #f3f4f6 !important;
             border: none !important;
             box-shadow: none !important;
+            border-radius: 50% !important; /* Make buttons completely round */
         }
 
         div[data-testid="stChatInput"] button:hover {
-            background: #eceef2 !important;
+            background: #e9edf5 !important;
         }
 
         div[data-testid="stChatInput"] svg {
-            fill: #8a8f9c !important;
-            stroke: #8a8f9c !important;
+            fill: #65708a !important; /* Darker grey icons for the chat box */
+            stroke: #65708a !important;
         }
 
         div[data-testid="stChatInput"] svg * {
-            fill: #8a8f9c !important;
-            stroke: #8a8f9c !important;
+            fill: #65708a !important;
+            stroke: #65708a !important;
         }
         </style>
         """,
