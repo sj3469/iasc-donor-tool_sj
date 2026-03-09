@@ -47,6 +47,7 @@ def inject_css() -> None:
             --sidebar-text: #ffffff;
             --sidebar-line: #eef2f8;
             --soft-line: #e9edf5;
+            --chat-focus: #f4efe6;
         }
 
         html, body, [class*="css"] {
@@ -69,80 +70,85 @@ def inject_css() -> None:
         header[data-testid="stHeader"],
         [data-testid="stHeader"] {
             background: var(--bg) !important;
-            border-bottom: 1px solid var(--soft-line) !important;
+            border-bottom: 1px solid transparent !important;
         }
 
         [data-testid="stDecoration"] {
             background: var(--bg) !important;
         }
 
-        [data-testid="stHeader"],
+        [data-testid="stHeader"] {
+            background: var(--bg) !important;
+        }
+
         [data-testid="stToolbar"],
         [data-testid="stStatusWidget"] {
-            background: var(--bg) !important;
-            color: var(--navy) !important;
+            background: var(--navy) !important;
+            border-radius: 14px !important;
+            padding: 0.28rem 0.55rem !important;
+            margin-top: 0.35rem !important;
+            box-shadow: none !important;
         }
 
-        [data-testid="stHeader"] *,
+        [data-testid="stToolbar"] {
+            margin-right: 0.25rem !important;
+        }
+
+        [data-testid="stStatusWidget"] {
+            margin-right: 0.45rem !important;
+        }
+
         [data-testid="stToolbar"] *,
         [data-testid="stStatusWidget"] * {
-            color: var(--navy) !important;
+            color: #ffffff !important;
         }
 
-        [data-testid="stHeader"] button,
         [data-testid="stToolbar"] button,
         [data-testid="stStatusWidget"] button,
         button[kind="header"],
         button[kind="headerNoPadding"] {
-            color: var(--navy) !important;
+            color: #ffffff !important;
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
         }
 
-        [data-testid="stHeader"] a,
         [data-testid="stToolbar"] a,
         [data-testid="stStatusWidget"] a,
-        [data-testid="stHeader"] span,
         [data-testid="stToolbar"] span,
         [data-testid="stStatusWidget"] span,
-        [data-testid="stHeader"] div,
         [data-testid="stToolbar"] div,
         [data-testid="stStatusWidget"] div {
-            color: var(--navy) !important;
+            color: #ffffff !important;
         }
 
-        [data-testid="stHeader"] svg,
         [data-testid="stToolbar"] svg,
         [data-testid="stStatusWidget"] svg,
         button[kind="header"] svg,
         button[kind="headerNoPadding"] svg {
-            fill: var(--navy) !important;
-            stroke: var(--navy) !important;
-            color: var(--navy) !important;
+            fill: #ffffff !important;
+            stroke: #ffffff !important;
+            color: #ffffff !important;
         }
 
-        [data-testid="stHeader"] svg *,
         [data-testid="stToolbar"] svg *,
         [data-testid="stStatusWidget"] svg *,
         button[kind="header"] svg *,
         button[kind="headerNoPadding"] svg * {
-            fill: var(--navy) !important;
-            stroke: var(--navy) !important;
+            fill: #ffffff !important;
+            stroke: #ffffff !important;
         }
 
-        [data-testid="stStatusWidget"] img,
-        [data-testid="stToolbar"] img,
-        [data-testid="stHeader"] img {
-            filter: brightness(0) saturate(100%) invert(8%) sepia(18%) saturate(1111%) hue-rotate(184deg) brightness(94%) contrast(95%) !important;
+        [data-testid="collapsedControl"] {
+            background: transparent !important;
         }
 
         [data-testid="collapsedControl"] button,
         [data-testid="collapsedControl"] svg,
         [data-testid="collapsedControl"] svg * {
-            color: var(--navy) !important;
-            fill: var(--navy) !important;
-            stroke: var(--navy) !important;
+            color: #ffffff !important;
+            fill: #ffffff !important;
+            stroke: #ffffff !important;
         }
 
         /* ---------- sidebar ---------- */
@@ -271,14 +277,15 @@ def inject_css() -> None:
 
         div[data-testid="stChatInput"] form {
             background: #ffffff !important;
-            border: 1px solid transparent !important;
-            border-radius: 22px !important;
+            border: 1px solid #f3f4f6 !important;
+            border-radius: 20px !important;
             box-shadow: none !important;
+            padding: 0.1rem 0.2rem !important;
         }
 
         div[data-testid="stChatInput"] form:focus-within {
-            border: 1px solid transparent !important;
-            box-shadow: none !important;
+            border: 1px solid var(--chat-focus) !important;
+            box-shadow: 0 0 0 2px rgba(244, 239, 230, 0.85) !important;
         }
 
         div[data-testid="stChatInput"] > div,
@@ -290,14 +297,15 @@ def inject_css() -> None:
 
         div[data-testid="stChatInput"] textarea {
             background: #ffffff !important;
-            color: var(--text) !important;
+            color: #5f6675 !important;
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
+            font-size: 0.97rem !important;
         }
 
         div[data-testid="stChatInput"] textarea::placeholder {
-            color: #6c7892 !important;
+            color: #7b8090 !important;
             opacity: 1 !important;
         }
 
@@ -305,6 +313,26 @@ def inject_css() -> None:
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
+        }
+
+        div[data-testid="stChatInput"] button {
+            background: #f3f4f6 !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        div[data-testid="stChatInput"] button:hover {
+            background: #eceef2 !important;
+        }
+
+        div[data-testid="stChatInput"] svg {
+            fill: #8a8f9c !important;
+            stroke: #8a8f9c !important;
+        }
+
+        div[data-testid="stChatInput"] svg * {
+            fill: #8a8f9c !important;
+            stroke: #8a8f9c !important;
         }
         </style>
         """,
@@ -629,7 +657,7 @@ for message in thread["messages"]:
     render_message(message)
 
 submission = st.chat_input(
-    "Ask about the donors",
+    "Ask about your donor community...",
     accept_file="multiple",
     file_type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
     key="main_chat_input",
