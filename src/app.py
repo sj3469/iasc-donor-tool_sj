@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import inspect
 from pathlib import Path
 import streamlit as st
 
@@ -60,10 +61,8 @@ def convert_to_csv(text):
 
 def scrub_tool_calls(text):
     """Aggressively removes 'Tool Call' and 'Results' blocks from the AI's output."""
-    # Matches Tool Call -> Results -> End of code block/JSON array
     cleaned = re.sub(r'Tool Call:[\s\S]*?Results:[\s\S]*?\]\n*```?\n*', '', text)
     cleaned = re.sub(r'\*?\*?Tool Call:?\*?\*?[\s\S]*?Results:[\s\S]*?(?=\n\n(?:#|\*|[A-Z])|\Z)', '', cleaned)
-    # If the AI adds introductory fluff before the tool call, strip it
     cleaned = re.sub(r'^Here are the top 10 donors by total giving:\n*(?=Top 10 Donors)', '', cleaned, flags=re.IGNORECASE)
     return cleaned.strip()
 
@@ -84,7 +83,7 @@ def inject_css() -> None:
             --sidebar-text: #ffffff;
         }
         
-        /* 1. Main App Styling (Force Light) */
+        /* 1. Main App Styling */
         [data-testid="stAppViewContainer"] { background-color: var(--main-bg) !important; }
         [data-testid="stAppViewContainer"] h1, 
         [data-testid="stAppViewContainer"] h2, 
@@ -153,21 +152,18 @@ def inject_css() -> None:
         }
 
         /* 4. Bottom Chat Area */
-        [data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottom"] > div > div {
+        [data-testid="stBottom"], [data-testid="stBottom"] > div {
             background-color: var(--main-bg) !important;
-            background: var(--main-bg) !important;
             border-top: none !important;
         }
 
-        /* 5. Chat Input Box (Aggressively Forced White) */
-        .stChatInput, .stChatInput * {
-            background-color: transparent !important;
-        }
+        /* 5. Chat Input Box */
         div[data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 24px !important;
             box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+            padding: 5px 15px !important;
         }
         div[data-testid="stChatInputContainer"]:focus-within {
             border: 1px solid var(--focus-grey) !important; 
@@ -274,27 +270,41 @@ for idx, message in enumerate(st.session_state.messages):
                 file_name=f"iasc_data_export_{idx}.{file_ext}", mime=mime_type, key=f"dl_btn_{idx}"
             )
 
-# --- CHAT INPUT & FILE UPLOADER ---
-try:
-    prompt_input = st.chat_input("Ask about your donor community...", accept_file=True)
-except TypeError:
-    prompt_input = st.chat_input("Ask about your donor community...")
+# --- CHAT INPUT & FILE UPLOADER (BUG FIXED) ---
+# Inspect Streamlit's capabilities safely to guarantee we only call st.chat_input ONCE
+supports_chat_attachments = "accept_file" in inspect.signature(st.chat_input).parameters
 
 active_prompt = None
 uploaded_file = None
 
-if prompt_input:
-    if isinstance(prompt_input, str):
-        active_prompt = prompt_input
-    else:
-        active_prompt = prompt_input.text
-        uploaded_file = prompt_input.files[0] if prompt_input.files else None
-        if not active_prompt and uploaded_file:
-            active_prompt = f"Please analyze this attached file: {uploaded_file.name}"
-elif st.session_state.pending_prompt:
+if supports_chat_attachments:
+    prompt_input = st.chat_input("Ask about your donor community...", accept_file=True)
+    if prompt_input:
+        if hasattr(prompt_input, "text"):
+            active_prompt = prompt_input.text
+            uploaded_file = prompt_input.files[0] if prompt_input.files else None
+        elif isinstance(prompt_input, dict):
+            active_prompt = prompt_input.get("text", "")
+            files = prompt_input.get("files", [])
+            uploaded_file = files[0] if files else None
+        else:
+            active_prompt = str(prompt_input)
+else:
+    # Safe fallback layout if your Streamlit version is older than 1.43
+    with st.container():
+        uploaded_file = st.file_uploader("📎 Attach a donor report (CSV/PDF)", type=['csv', 'pdf', 'txt'])
+        prompt_input = st.chat_input("Ask about your donor community...")
+        if prompt_input:
+            active_prompt = prompt_input
+            if not active_prompt and uploaded_file:
+                active_prompt = f"Please analyze this attached file: {uploaded_file.name}"
+
+# Handle FAQ button clicks
+if st.session_state.pending_prompt:
     active_prompt = st.session_state.pending_prompt
     st.session_state.pending_prompt = None
 
+# --- EXECUTE CHAT ---
 if active_prompt:
     st.session_state.messages.append({"role": "user", "content": active_prompt})
     with st.chat_message("user"):
@@ -304,8 +314,8 @@ if active_prompt:
         response_placeholder = st.empty()
         with st.status("Consulting IASC records...", expanded=True) as status:
             
-            # --- THE SILENT PROMPT (Instructs the AI to hide its work) ---
-            hidden_instruction = "\n\n[CRITICAL: Do NOT output 'Tool Call:' or 'Results:' blocks in your response. Do not show your raw data retrieval steps. Only output the final, human-readable answer.]"
+            # The Silent Prompt prevents the AI from outputting messy JSON code blocks
+            hidden_instruction = "\n\n[CRITICAL: Do NOT output 'Tool Call:' or 'Results:' blocks in your response. Do not show your raw data retrieval steps. Only output the final, formatted human-readable answer.]"
             enhanced_prompt = active_prompt + hidden_instruction
 
             raw_response, usage = get_response(
@@ -316,9 +326,7 @@ if active_prompt:
                 attachment=uploaded_file
             )
             
-            # --- THE SCRUBBER (Failsafe clean up) ---
             clean_response_text = scrub_tool_calls(raw_response)
-            
             status.update(label="Complete!", state="complete", expanded=False)
         
         response_placeholder.markdown(clean_response_text)
