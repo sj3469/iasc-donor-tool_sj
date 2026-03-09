@@ -34,20 +34,18 @@ def inject_css() -> None:
         :root {
             --bg: #f7f8fb;
             --panel: #ffffff;
-            --panel-2: #f8f9fc;
+            --panel-soft: #f8f9fc;
             --border: #d8deea;
             --text: #172033;
             --muted: #65708a;
             --accent: #24324a;
             --accent-hover: #1c273b;
             --chip: #eef2f8;
+            --navy: #0f1728;
             --sidebar-bg: #0f1728;
             --sidebar-border: #25324a;
             --sidebar-text: #ffffff;
-            --sidebar-muted: #eef3ff;
-            --sidebar-line: #e8edf7;
-            --navy: #0f1728;
-            --soft-line: #e8edf7;
+            --sidebar-line: #eef2f8;
         }
 
         html, body, [class*="css"] {
@@ -59,35 +57,27 @@ def inject_css() -> None:
             color: var(--text);
         }
 
-        .stApp > header {
-            background: #ffffff !important;
-        }
-
+        .stApp > header,
         header[data-testid="stHeader"] {
             background: #ffffff !important;
-            border-bottom: 1px solid var(--soft-line) !important;
+            border-bottom: 1px solid #e9edf5 !important;
         }
 
-        [data-testid="stHeader"] * {
+        [data-testid="stToolbar"] button,
+        [data-testid="stToolbar"] a,
+        [data-testid="stToolbar"] div,
+        [data-testid="stToolbar"] span {
             color: var(--navy) !important;
-            fill: var(--navy) !important;
         }
 
-        [data-testid="stToolbar"] * {
-            color: var(--navy) !important;
+        [data-testid="stToolbar"] svg,
+        [data-testid="stToolbar"] path {
             fill: var(--navy) !important;
+            stroke: var(--navy) !important;
         }
 
         [data-testid="stDecoration"] {
             background: #ffffff !important;
-        }
-
-        button[kind="header"] {
-            color: var(--navy) !important;
-        }
-
-        button[kind="header"] svg {
-            fill: var(--navy) !important;
         }
 
         [data-testid="stSidebar"] {
@@ -99,39 +89,20 @@ def inject_css() -> None:
             color: var(--sidebar-text) !important;
         }
 
-        [data-testid="stSidebar"] .stCaption,
-        [data-testid="stSidebar"] small,
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div {
-            color: var(--sidebar-text) !important;
-        }
-
-        [data-testid="stSidebar"] input::placeholder,
-        [data-testid="stSidebar"] textarea::placeholder {
-            color: var(--sidebar-text) !important;
-            opacity: 1 !important;
-        }
-
         [data-testid="stSidebar"] hr {
             border: none !important;
             border-top: 1px solid var(--sidebar-line) !important;
         }
 
         .block-container {
-            padding-top: 1.2rem;
-            padding-bottom: 5rem;
             max-width: 980px;
-        }
-
-        h1, h2, h3, h4, h5, h6, p, span, label, div {
-            color: var(--text);
+            padding-top: 1.25rem;
+            padding-bottom: 5rem;
         }
 
         .app-subtitle {
             color: var(--muted);
-            margin-top: -0.2rem;
+            margin-top: -0.15rem;
             margin-bottom: 1rem;
             font-size: 0.98rem;
         }
@@ -140,6 +111,7 @@ def inject_css() -> None:
             font-size: 1.05rem;
             font-weight: 600;
             margin-bottom: 0.2rem;
+            color: var(--text);
         }
 
         .thread-meta {
@@ -148,43 +120,47 @@ def inject_css() -> None:
             margin-bottom: 1rem;
         }
 
-        div[data-testid="stTextInput"] input,
-        textarea,
-        input,
-        div[data-baseweb="select"] > div {
-            background: var(--panel) !important;
-            color: var(--text) !important;
-            border: 1px solid var(--border) !important;
+        .model-chip {
+            display: inline-block;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.32rem 0.72rem;
+            font-size: 0.82rem;
+            color: var(--text);
+            background: var(--chip);
+            margin-bottom: 0.8rem;
+        }
+
+        div[data-testid="stTextInput"] input {
+            background: #162033 !important;
+            color: #ffffff !important;
+            border: 1px solid #31415f !important;
             border-radius: 14px !important;
             box-shadow: none !important;
         }
 
-        [data-testid="stSidebar"] div[data-testid="stTextInput"] input,
-        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
-            background: #162033 !important;
-            color: var(--sidebar-text) !important;
-            border: 1px solid #31415f !important;
+        div[data-testid="stTextInput"] input::placeholder {
+            color: #ffffff !important;
+            opacity: 1 !important;
         }
 
-        div[data-testid="stTextInput"] input:focus,
-        textarea:focus,
-        input:focus {
-            border: 1px solid #9aa8c6 !important;
-            box-shadow: 0 0 0 1px #9aa8c6 !important;
-            outline: none !important;
-        }
-
-        [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus,
-        [data-testid="stSidebar"] textarea:focus,
-        [data-testid="stSidebar"] input:focus {
+        div[data-testid="stTextInput"] input:focus {
             border: 1px solid #5e7398 !important;
             box-shadow: 0 0 0 1px #5e7398 !important;
             outline: none !important;
         }
 
+        div[data-baseweb="select"] > div {
+            background: #162033 !important;
+            color: #ffffff !important;
+            border: 1px solid #31415f !important;
+            border-radius: 14px !important;
+            box-shadow: none !important;
+        }
+
         div[data-testid="stButton"] button {
             background: var(--accent) !important;
-            color: white !important;
+            color: #ffffff !important;
             border: 1px solid var(--accent) !important;
             border-radius: 12px !important;
         }
@@ -211,8 +187,8 @@ def inject_css() -> None:
         }
 
         div[data-testid="stChatInput"] textarea {
-            color: var(--text) !important;
             background: transparent !important;
+            color: var(--text) !important;
             border: none !important;
             outline: none !important;
             box-shadow: none !important;
@@ -234,28 +210,14 @@ def inject_css() -> None:
             border-radius: 14px;
             padding: 0.9rem 1rem;
             background: #162033;
-            color: var(--sidebar-text);
         }
 
         .usage-box div {
-            color: var(--sidebar-text) !important;
-        }
-
-        .model-chip {
-            display: inline-block;
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 0.32rem 0.7rem;
-            font-size: 0.82rem;
-            color: var(--text);
-            background: var(--chip);
-            margin-bottom: 0.75rem;
+            color: #ffffff !important;
         }
 
         [data-testid="stExpander"] {
-            border: 1px solid var(--border) !important;
             border-radius: 14px !important;
-            background: var(--panel) !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stExpander"] {
@@ -429,6 +391,24 @@ def session_spend_and_remaining() -> tuple[float, float]:
     return spent, remaining
 
 
+def render_usage_box(container) -> None:
+    spent, remaining = session_spend_and_remaining()
+    container.markdown("#### Session usage")
+    container.markdown(
+        f"""
+        <div class="usage-box">
+            <div>Questions: {len(st.session_state.tracker.responses)}</div>
+            <div>API calls: {st.session_state.tracker.total_api_calls}</div>
+            <div>Input tokens: {st.session_state.tracker.total_input_tokens:,}</div>
+            <div>Output tokens: {st.session_state.tracker.total_output_tokens:,}</div>
+            <div>Spent: ${spent:.4f}</div>
+            <div>Left: ${remaining:.4f}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def parse_chat_submission(submission) -> tuple[str, list]:
     if submission is None:
         return "", []
@@ -461,6 +441,7 @@ def parse_chat_submission(submission) -> tuple[str, list]:
 ensure_state()
 inject_css()
 state_options = get_state_options()
+usage_placeholder = None
 
 with st.sidebar:
     selected_model = st.selectbox(
@@ -520,3 +501,99 @@ with st.sidebar:
         state_options,
         index=0,
     )
+
+    st.divider()
+
+    st.markdown("#### FAQ")
+    with st.expander("What can I ask here?"):
+        st.markdown(
+            "- Show top donors overall\n"
+            "- Show top donors in VA\n"
+            "- Show top donors in New York\n"
+            "- Show top donors in ZIP 10027\n"
+            "- Find lapsed donors worth re-engaging\n"
+            "- Identify high-potential prospects\n"
+            "- Summarize geographic donor distribution\n"
+            "- Show summary by state\n"
+            "- Plan a fundraising trip in DC\n"
+            "- Show donor 003XXXXXXXXXXXXXXX"
+        )
+
+    with st.expander("How do filters work?"):
+        st.markdown(
+            "Filters act as default constraints for broad queries. "
+            "If you ask for a different state or segment explicitly, your prompt overrides the defaults."
+        )
+
+    st.divider()
+    usage_placeholder = st.empty()
+    render_usage_box(usage_placeholder)
+
+thread = get_active_thread()
+
+st.title(APP_TITLE)
+st.markdown(f'<div class="app-subtitle">{APP_SUBTITLE}</div>', unsafe_allow_html=True)
+st.markdown(
+    f'<div class="model-chip">Model: {AVAILABLE_MODELS.get(selected_model, selected_model)}</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(f'<div class="thread-heading">{thread["title"]}</div>', unsafe_allow_html=True)
+st.markdown(
+    f'<div class="thread-meta">Thread updated: {thread.get("updated_at", "")}</div>',
+    unsafe_allow_html=True,
+)
+
+for message in thread["messages"]:
+    render_message(message)
+
+submission = st.chat_input(
+    "Ask about the donors",
+    accept_file="multiple",
+    file_type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
+    key="main_chat_input",
+)
+
+prompt, uploaded_files = parse_chat_submission(submission)
+
+if prompt or uploaded_files:
+    attachment_names = [f.name for f in uploaded_files]
+    effective_prompt = build_effective_prompt(prompt, donor_status_filter, state_filter) if prompt else ""
+
+    user_display = prompt if prompt else "[Files uploaded]"
+    add_message("user", user_display, attachments=attachment_names)
+
+    with st.chat_message("user"):
+        if prompt:
+            st.markdown(prompt)
+        else:
+            st.markdown("[Files uploaded]")
+        if attachment_names:
+            st.caption("Attached: " + ", ".join(attachment_names))
+
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+
+        try:
+            with st.status("Analyzing donor database...", expanded=True) as status:
+                response, usage = get_response(
+                    user_message=effective_prompt if prompt else "Please analyze the attached files if relevant.",
+                    conversation_history=thread["messages"][:-1],
+                    model=selected_model,
+                    session_tracker=st.session_state.tracker,
+                    attachment=uploaded_files,
+                )
+                status.update(label="Analysis complete", state="complete", expanded=False)
+
+            response_placeholder.text(response)
+            add_message("assistant", response)
+
+            st.caption(
+                f"Prompt tokens: {getattr(usage, 'prompt_token_count', 0)} | "
+                f"Output tokens: {getattr(usage, 'candidates_token_count', 0)}"
+            )
+
+            if usage_placeholder is not None:
+                render_usage_box(usage_placeholder)
+
+        except Exception as e:
+            st.error(f"Request failed: {e}")
