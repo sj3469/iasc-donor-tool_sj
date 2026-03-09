@@ -43,7 +43,6 @@ if not DB_PATH.exists():
 
 # --- HELPERS ---
 def convert_to_csv(text):
-    """Extracts markdown tables from the AI response and converts them to CSV."""
     lines = text.strip().split('\n')
     csv_lines = []
     for line in lines:
@@ -60,10 +59,11 @@ def convert_to_csv(text):
     return text.encode('utf-8')
 
 def scrub_tool_calls(text):
-    """Aggressively removes 'Tool Call' and 'Results' blocks from the AI's output."""
+    # Aggressively removes 'Tool Call', 'Results', and 'Fields' from the AI's output
     cleaned = re.sub(r'Tool Call:[\s\S]*?Results:[\s\S]*?\]\n*```?\n*', '', text)
     cleaned = re.sub(r'\*?\*?Tool Call:?\*?\*?[\s\S]*?Results:[\s\S]*?(?=\n\n(?:#|\*|[A-Z])|\Z)', '', cleaned)
     cleaned = re.sub(r'^Here are the top 10 donors by total giving:\n*(?=Top 10 Donors)', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'(?i)^fields:.*$', '', cleaned, flags=re.MULTILINE) # Removes database field mentions
     return cleaned.strip()
 
 # --- BULLETPROOF CSS INJECTION ---
@@ -77,6 +77,7 @@ def inject_css() -> None:
             --border-light: #e5e7eb;
             --focus-grey: #9ca3af;
             --accent-blue: #0b57d0;
+            --user-bubble: #f0f4f9; /* Soft Gemini Grey */
             
             --sidebar-bg: #0b1020; 
             --sidebar-border: #27314a;
@@ -90,15 +91,20 @@ def inject_css() -> None:
         [data-testid="stAppViewContainer"] h3 { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* Force Chat Messages to be Dark Text */
-        [data-testid="stChatMessageContent"] p, 
-        [data-testid="stChatMessageContent"] span, 
-        [data-testid="stChatMessageContent"] li, 
-        [data-testid="stChatMessageContent"] div {
+        /* 2. Chat Avatars & Message Backgrounds (COMPLETE OVERRIDE) */
+        [data-testid="stChatMessageAvatar"] {
+            display: none !important; /* Hides the red and orange icons */
+        }
+        [data-testid="stChatMessage"] {
+            background-color: transparent !important; /* Strips Streamlit's dark grey box */
+            gap: 0 !important;
+            padding-left: 0 !important;
+        }
+        [data-testid="stChatMessageContent"] {
             color: var(--main-text) !important;
         }
         [data-testid="stChatMessageContent"] pre {
-            background-color: #f3f4f6 !important;
+            background-color: #f3f4f6 !important; /* Light grey for code blocks */
             border: 1px solid var(--border-light) !important;
             border-radius: 12px !important;
         }
@@ -106,25 +112,19 @@ def inject_css() -> None:
             color: #1f2937 !important;
         }
 
-        /* 2. Top Navbar */
-        header[data-testid="stHeader"] { 
-            background-color: var(--sidebar-bg) !important; 
-        }
-        header[data-testid="stHeader"] button, 
-        header[data-testid="stHeader"] svg, 
-        header[data-testid="stHeader"] span {
-            color: #ffffff !important; 
-            fill: #ffffff !important;
+        /* 3. Top Navbar */
+        header[data-testid="stHeader"] { background-color: var(--sidebar-bg) !important; }
+        header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg, header[data-testid="stHeader"] span {
+            color: #ffffff !important; fill: #ffffff !important;
         }
 
-        /* 3. Sidebar Styling */
+        /* 4. Sidebar Styling */
         [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
         }
-        [data-testid="stSidebar"] * { 
-            color: var(--sidebar-text) !important; 
-        }
+        [data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
+        
         [data-testid="stSidebar"] div[data-baseweb="select"] > div,
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
@@ -136,6 +136,7 @@ def inject_css() -> None:
         [data-testid="stSidebar"] ul[data-baseweb="menu"] { background-color: #12182b !important; }
         [data-testid="stSidebar"] ul[data-baseweb="menu"] li { color: var(--sidebar-text) !important; }
 
+        /* Small Clear Chat Button */
         [data-testid="stSidebar"] div[data-testid="stButton"] button {
             background-color: transparent !important;
             border: 1px solid var(--sidebar-border) !important;
@@ -151,13 +152,13 @@ def inject_css() -> None:
             border-color: #ef4444 !important; color: #ef4444 !important;
         }
 
-        /* 4. Bottom Chat Area */
+        /* 5. Bottom Chat Area */
         [data-testid="stBottom"], [data-testid="stBottom"] > div {
             background-color: var(--main-bg) !important;
             border-top: none !important;
         }
 
-        /* 5. Chat Input Box */
+        /* 6. Chat Input Box (White pill, Grey focus) */
         div[data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
             border: 1px solid #d1d5db !important;
@@ -171,17 +172,14 @@ def inject_css() -> None:
             outline: none !important;
         }
         div[data-testid="stChatInputContainer"] textarea {
-            color: #111827 !important;
-            -webkit-text-fill-color: #111827 !important;
-            background-color: #ffffff !important;
-        }
-        div[data-testid="stChatInputContainer"] button svg {
-            fill: #6b7280 !important; color: #6b7280 !important;
+            color: var(--main-text) !important;
+            -webkit-text-fill-color: var(--main-text) !important;
+            background-color: transparent !important;
         }
 
-        /* 6. FAQ Buttons */
+        /* 7. FAQ Buttons */
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button {
-            background-color: #f0f4f9 !important;
+            background-color: var(--user-bubble) !important;
             border: none !important;
             border-radius: 20px !important;
             padding: 10px 20px !important;
@@ -193,7 +191,7 @@ def inject_css() -> None:
             background-color: #e8f0fe !important;
         }
         
-        /* 7. Download Button */
+        /* 8. Download Button */
         .stDownloadButton button {
             background-color: #ffffff !important; border: 1px solid #e5e7eb !important; border-radius: 8px !important;
         }
@@ -217,6 +215,7 @@ with st.sidebar:
     st.text_input("Search", placeholder="Search chats (⇧⌘K)", label_visibility="collapsed")
     selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
     st.divider()
+    
     st.markdown("<h4 style='color: #ffffff; margin-bottom: 10px;'>Quick Filters</h4>", unsafe_allow_html=True)
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
@@ -258,8 +257,13 @@ if not st.session_state.messages:
 # --- RENDER MESSAGES & DOWNLOAD BUTTONS ---
 for idx, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-        if message["role"] == "assistant":
+        if message["role"] == "user":
+            # Wraps the user message in a soft, light-grey Gemini bubble
+            st.markdown(f'<div style="background-color: #f0f4f9; padding: 12px 18px; border-radius: 12px; display: inline-block; color: #111827;">{message["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(message["content"])
+            
+            # Add download button to assistant messages
             csv_data = convert_to_csv(message["content"])
             is_csv = b',' in csv_data and b'\n' in csv_data
             file_ext = "csv" if is_csv else "txt"
@@ -270,8 +274,7 @@ for idx, message in enumerate(st.session_state.messages):
                 file_name=f"iasc_data_export_{idx}.{file_ext}", mime=mime_type, key=f"dl_btn_{idx}"
             )
 
-# --- CHAT INPUT & FILE UPLOADER (BUG FIXED) ---
-# Inspect Streamlit's capabilities safely to guarantee we only call st.chat_input ONCE
+# --- CHAT INPUT & FILE UPLOADER ---
 supports_chat_attachments = "accept_file" in inspect.signature(st.chat_input).parameters
 
 active_prompt = None
@@ -290,7 +293,6 @@ if supports_chat_attachments:
         else:
             active_prompt = str(prompt_input)
 else:
-    # Safe fallback layout if your Streamlit version is older than 1.43
     with st.container():
         uploaded_file = st.file_uploader("📎 Attach a donor report (CSV/PDF)", type=['csv', 'pdf', 'txt'])
         prompt_input = st.chat_input("Ask about your donor community...")
@@ -299,7 +301,6 @@ else:
             if not active_prompt and uploaded_file:
                 active_prompt = f"Please analyze this attached file: {uploaded_file.name}"
 
-# Handle FAQ button clicks
 if st.session_state.pending_prompt:
     active_prompt = st.session_state.pending_prompt
     st.session_state.pending_prompt = None
@@ -308,14 +309,14 @@ if st.session_state.pending_prompt:
 if active_prompt:
     st.session_state.messages.append({"role": "user", "content": active_prompt})
     with st.chat_message("user"):
-        st.markdown(active_prompt)
+        st.markdown(f'<div style="background-color: #f0f4f9; padding: 12px 18px; border-radius: 12px; display: inline-block; color: #111827;">{active_prompt}</div>', unsafe_allow_html=True)
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         with st.status("Consulting IASC records...", expanded=True) as status:
             
-            # The Silent Prompt prevents the AI from outputting messy JSON code blocks
-            hidden_instruction = "\n\n[CRITICAL: Do NOT output 'Tool Call:' or 'Results:' blocks in your response. Do not show your raw data retrieval steps. Only output the final, formatted human-readable answer.]"
+            # Stronger instructions to hide raw SQL logic, "Fields:", and Tool outputs
+            hidden_instruction = "\n\n[CRITICAL INSTRUCTIONS: 1. Do NOT output 'Tool Call:' or 'Results:' blocks. 2. Do NOT mention the word 'fields', list dataset column names, or output raw JSON. 3. Present the data directly and naturally as a human analyst.]"
             enhanced_prompt = active_prompt + hidden_instruction
 
             raw_response, usage = get_response(
