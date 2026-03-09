@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from pathlib import Path
 import streamlit as st
 
@@ -39,8 +40,9 @@ if not DB_PATH.exists():
         except Exception as e:
             st.error(f"Failed to generate database: {e}")
 
-# --- HELPER: CSV PARSER ---
+# --- HELPERS ---
 def convert_to_csv(text):
+    """Extracts markdown tables from the AI response and converts them to CSV."""
     lines = text.strip().split('\n')
     csv_lines = []
     for line in lines:
@@ -55,6 +57,15 @@ def convert_to_csv(text):
     if csv_lines:
         return "\n".join(csv_lines).encode('utf-8')
     return text.encode('utf-8')
+
+def scrub_tool_calls(text):
+    """Aggressively removes 'Tool Call' and 'Results' blocks from the AI's output."""
+    # Matches Tool Call -> Results -> End of code block/JSON array
+    cleaned = re.sub(r'Tool Call:[\s\S]*?Results:[\s\S]*?\]\n*```?\n*', '', text)
+    cleaned = re.sub(r'\*?\*?Tool Call:?\*?\*?[\s\S]*?Results:[\s\S]*?(?=\n\n(?:#|\*|[A-Z])|\Z)', '', cleaned)
+    # If the AI adds introductory fluff before the tool call, strip it
+    cleaned = re.sub(r'^Here are the top 10 donors by total giving:\n*(?=Top 10 Donors)', '', cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
 
 # --- BULLETPROOF CSS INJECTION ---
 def inject_css() -> None:
@@ -80,27 +91,23 @@ def inject_css() -> None:
         [data-testid="stAppViewContainer"] h3 { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* 2. FORCE Chat Messages & Code Blocks to be Light Background / Dark Text */
+        /* Force Chat Messages to be Dark Text */
         [data-testid="stChatMessageContent"] p, 
         [data-testid="stChatMessageContent"] span, 
         [data-testid="stChatMessageContent"] li, 
         [data-testid="stChatMessageContent"] div {
             color: var(--main-text) !important;
         }
-        /* Defeat the Black Box for Code/SQL */
         [data-testid="stChatMessageContent"] pre {
-            background-color: #f3f4f6 !important; /* Soft light grey */
+            background-color: #f3f4f6 !important;
             border: 1px solid var(--border-light) !important;
             border-radius: 12px !important;
-            padding: 1rem !important;
         }
         [data-testid="stChatMessageContent"] code {
-            color: #1f2937 !important; /* Dark text */
-            background-color: transparent !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+            color: #1f2937 !important;
         }
 
-        /* 3. Top Navbar (Dark Background, White Icons) */
+        /* 2. Top Navbar */
         header[data-testid="stHeader"] { 
             background-color: var(--sidebar-bg) !important; 
         }
@@ -111,7 +118,7 @@ def inject_css() -> None:
             fill: #ffffff !important;
         }
 
-        /* 4. Sidebar Styling (Force Dark Background & Bright Text) */
+        /* 3. Sidebar Styling */
         [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
@@ -119,8 +126,6 @@ def inject_css() -> None:
         [data-testid="stSidebar"] * { 
             color: var(--sidebar-text) !important; 
         }
-        
-        /* Sidebar Inputs & Dropdowns */
         [data-testid="stSidebar"] div[data-baseweb="select"] > div,
         [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
@@ -129,47 +134,36 @@ def inject_css() -> None:
             border-radius: 8px;
             -webkit-text-fill-color: var(--sidebar-text) !important;
         }
-        
-        /* Fix Dropdown Menu Popups in Sidebar */
-        [data-testid="stSidebar"] ul[data-baseweb="menu"] {
-            background-color: #12182b !important;
-        }
-        [data-testid="stSidebar"] ul[data-baseweb="menu"] li {
-            color: var(--sidebar-text) !important;
-        }
+        [data-testid="stSidebar"] ul[data-baseweb="menu"] { background-color: #12182b !important; }
+        [data-testid="stSidebar"] ul[data-baseweb="menu"] li { color: var(--sidebar-text) !important; }
 
-        /* Small, Subtle "Clear Chat" Button under Session Usage */
         [data-testid="stSidebar"] div[data-testid="stButton"] button {
             background-color: transparent !important;
             border: 1px solid var(--sidebar-border) !important;
-            color: #9ca3af !important; /* Muted grey */
+            color: #9ca3af !important;
             border-radius: 6px !important;
             padding: 2px 12px !important;
             font-size: 0.85rem !important;
             min-height: 32px !important;
-            width: auto !important; /* Prevents it from stretching */
+            width: auto !important;
             display: inline-flex !important;
         }
         [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-            border-color: #ef4444 !important;
-            color: #ef4444 !important;
+            border-color: #ef4444 !important; color: #ef4444 !important;
         }
 
-        /* 5. Bottom Chat Area (Force absolute white background) */
-        [data-testid="stBottom"], 
-        [data-testid="stBottom"] > div,
-        [data-testid="stBottom"] > div > div {
+        /* 4. Bottom Chat Area */
+        [data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottom"] > div > div {
             background-color: var(--main-bg) !important;
             background: var(--main-bg) !important;
             border-top: none !important;
         }
 
-        /* 6. Chat Input Box (Force White Pill, Grey Focus) */
-        div[data-testid="stChatInput"] { 
-            background-color: transparent !important; 
+        /* 5. Chat Input Box (Aggressively Forced White) */
+        .stChatInput, .stChatInput * {
+            background-color: transparent !important;
         }
-        div[data-testid="stChatInputContainer"], 
-        div[data-testid="stChatInputContainer"] > div {
+        div[data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
             border: 1px solid #d1d5db !important;
             border-radius: 24px !important;
@@ -181,16 +175,15 @@ def inject_css() -> None:
             outline: none !important;
         }
         div[data-testid="stChatInputContainer"] textarea {
-            color: var(--main-text) !important;
-            -webkit-text-fill-color: var(--main-text) !important;
-            background-color: transparent !important;
+            color: #111827 !important;
+            -webkit-text-fill-color: #111827 !important;
+            background-color: #ffffff !important;
         }
         div[data-testid="stChatInputContainer"] button svg {
-            fill: #6b7280 !important;
-            color: #6b7280 !important;
+            fill: #6b7280 !important; color: #6b7280 !important;
         }
 
-        /* 7. FAQ Buttons */
+        /* 6. FAQ Buttons */
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button {
             background-color: #f0f4f9 !important;
             border: none !important;
@@ -198,21 +191,15 @@ def inject_css() -> None:
             padding: 10px 20px !important;
         }
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button p {
-            color: #1f1f1f !important;
-            font-weight: 400 !important;
+            color: #1f1f1f !important; font-weight: 400 !important;
         }
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button:hover {
             background-color: #e8f0fe !important;
         }
-        [data-testid="stAppViewContainer"] div[data-testid="stButton"] button:hover p {
-            color: var(--accent-blue) !important;
-        }
         
-        /* 8. Download Button */
+        /* 7. Download Button */
         .stDownloadButton button {
-            background-color: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-            border-radius: 8px !important;
+            background-color: #ffffff !important; border: 1px solid #e5e7eb !important; border-radius: 8px !important;
         }
         .stDownloadButton button p { color: #111827 !important; }
         </style>
@@ -229,31 +216,23 @@ if "tracker" not in st.session_state:
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None
 
-# --- SIDEBAR (Reorganized) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    # 1. Search at the very top 
     st.text_input("Search", placeholder="Search chats (⇧⌘K)", label_visibility="collapsed")
-    
-    # 2. Model Selection
     selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
-    
     st.divider()
-    
-    # 3. Quick Filters
     st.markdown("<h4 style='color: #ffffff; margin-bottom: 10px;'>Quick Filters</h4>", unsafe_allow_html=True)
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
-    
     st.divider()
     
-    # 4. Session Usage & Clear Chat Button
     tracker_placeholder = st.empty()
     try:
         tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
     except Exception:
         pass 
         
-    st.write("") # Tiny spacer
+    st.write("") 
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
@@ -291,11 +270,8 @@ for idx, message in enumerate(st.session_state.messages):
             mime_type = "text/csv" if is_csv else "text/plain"
             
             st.download_button(
-                label="📥 Download Data",
-                data=csv_data,
-                file_name=f"iasc_data_export_{idx}.{file_ext}",
-                mime=mime_type,
-                key=f"dl_btn_{idx}"
+                label="📥 Download Data", data=csv_data,
+                file_name=f"iasc_data_export_{idx}.{file_ext}", mime=mime_type, key=f"dl_btn_{idx}"
             )
 
 # --- CHAT INPUT & FILE UPLOADER ---
@@ -327,17 +303,26 @@ if active_prompt:
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         with st.status("Consulting IASC records...", expanded=True) as status:
-            response, usage = get_response(
-                user_message=active_prompt,
+            
+            # --- THE SILENT PROMPT (Instructs the AI to hide its work) ---
+            hidden_instruction = "\n\n[CRITICAL: Do NOT output 'Tool Call:' or 'Results:' blocks in your response. Do not show your raw data retrieval steps. Only output the final, human-readable answer.]"
+            enhanced_prompt = active_prompt + hidden_instruction
+
+            raw_response, usage = get_response(
+                user_message=enhanced_prompt,
                 conversation_history=st.session_state.messages[:-1],
                 model=selected_model,
                 session_tracker=st.session_state.tracker,
                 attachment=uploaded_file
             )
+            
+            # --- THE SCRUBBER (Failsafe clean up) ---
+            clean_response_text = scrub_tool_calls(raw_response)
+            
             status.update(label="Complete!", state="complete", expanded=False)
         
-        response_placeholder.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        response_placeholder.markdown(clean_response_text)
+        st.session_state.messages.append({"role": "assistant", "content": clean_response_text})
         
         tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
         st.rerun()
