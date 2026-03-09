@@ -46,10 +46,15 @@ def inject_css() -> None:
             --sidebar-border: #25324a;
             --sidebar-text: #ffffff;
             --sidebar-line: #eef2f8;
+            --soft-line: #e9edf5;
         }
 
         html, body, [class*="css"] {
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        body {
+            color: var(--text);
         }
 
         .stApp {
@@ -57,29 +62,58 @@ def inject_css() -> None:
             color: var(--text);
         }
 
+        /* Top header */
         .stApp > header,
-        header[data-testid="stHeader"] {
+        header,
+        header[data-testid="stHeader"],
+        [data-testid="stHeader"] {
             background: #ffffff !important;
-            border-bottom: 1px solid #e9edf5 !important;
-        }
-
-        [data-testid="stToolbar"] button,
-        [data-testid="stToolbar"] a,
-        [data-testid="stToolbar"] div,
-        [data-testid="stToolbar"] span {
-            color: var(--navy) !important;
-        }
-
-        [data-testid="stToolbar"] svg,
-        [data-testid="stToolbar"] path {
-            fill: var(--navy) !important;
-            stroke: var(--navy) !important;
+            border-bottom: 1px solid var(--soft-line) !important;
         }
 
         [data-testid="stDecoration"] {
             background: #ffffff !important;
         }
 
+        [data-testid="stHeader"] *,
+        [data-testid="stToolbar"] * {
+            color: var(--navy) !important;
+        }
+
+        [data-testid="stHeader"] button,
+        [data-testid="stToolbar"] button,
+        button[kind="header"] {
+            color: var(--navy) !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        [data-testid="stHeader"] svg,
+        [data-testid="stToolbar"] svg,
+        button[kind="header"] svg {
+            fill: var(--navy) !important;
+            stroke: var(--navy) !important;
+            color: var(--navy) !important;
+        }
+
+        [data-testid="stHeader"] svg *,
+        [data-testid="stToolbar"] svg *,
+        button[kind="header"] svg * {
+            fill: var(--navy) !important;
+            stroke: var(--navy) !important;
+        }
+
+        [data-testid="stHeader"] a,
+        [data-testid="stToolbar"] a,
+        [data-testid="stHeader"] span,
+        [data-testid="stToolbar"] span,
+        [data-testid="stHeader"] div,
+        [data-testid="stToolbar"] div {
+            color: var(--navy) !important;
+        }
+
+        /* Sidebar */
         [data-testid="stSidebar"] {
             background: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border);
@@ -94,10 +128,15 @@ def inject_css() -> None:
             border-top: 1px solid var(--sidebar-line) !important;
         }
 
+        /* Main layout */
         .block-container {
             max-width: 980px;
             padding-top: 1.25rem;
             padding-bottom: 5rem;
+        }
+
+        h1, h2, h3, h4, h5, h6, p, span, label, div {
+            color: var(--text);
         }
 
         .app-subtitle {
@@ -131,7 +170,8 @@ def inject_css() -> None:
             margin-bottom: 0.8rem;
         }
 
-        div[data-testid="stTextInput"] input {
+        /* Sidebar inputs */
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background: #162033 !important;
             color: #ffffff !important;
             border: 1px solid #31415f !important;
@@ -139,18 +179,18 @@ def inject_css() -> None:
             box-shadow: none !important;
         }
 
-        div[data-testid="stTextInput"] input::placeholder {
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input::placeholder {
             color: #ffffff !important;
             opacity: 1 !important;
         }
 
-        div[data-testid="stTextInput"] input:focus {
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input:focus {
             border: 1px solid #5e7398 !important;
             box-shadow: 0 0 0 1px #5e7398 !important;
             outline: none !important;
         }
 
-        div[data-baseweb="select"] > div {
+        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
             background: #162033 !important;
             color: #ffffff !important;
             border: 1px solid #31415f !important;
@@ -158,11 +198,13 @@ def inject_css() -> None:
             box-shadow: none !important;
         }
 
+        /* Buttons */
         div[data-testid="stButton"] button {
             background: var(--accent) !important;
             color: #ffffff !important;
             border: 1px solid var(--accent) !important;
             border-radius: 12px !important;
+            box-shadow: none !important;
         }
 
         div[data-testid="stButton"] button:hover {
@@ -170,24 +212,32 @@ def inject_css() -> None:
             border-color: var(--accent-hover) !important;
         }
 
+        /* Chat input */
         div[data-testid="stChatInput"] {
             background: transparent !important;
         }
 
-        div[data-testid="stChatInput"] > div {
-            background: var(--panel) !important;
+        div[data-testid="stChatInput"] form {
+            background: #ffffff !important;
             border: 1px solid transparent !important;
             border-radius: 22px !important;
             box-shadow: none !important;
         }
 
-        div[data-testid="stChatInput"] > div:focus-within {
+        div[data-testid="stChatInput"] form:focus-within {
             border: 1px solid transparent !important;
             box-shadow: none !important;
         }
 
+        div[data-testid="stChatInput"] > div,
+        div[data-testid="stChatInput"] section,
+        div[data-testid="stChatInput"] label {
+            background: #ffffff !important;
+            box-shadow: none !important;
+        }
+
         div[data-testid="stChatInput"] textarea {
-            background: transparent !important;
+            background: #ffffff !important;
             color: var(--text) !important;
             border: none !important;
             outline: none !important;
@@ -205,6 +255,7 @@ def inject_css() -> None:
             box-shadow: none !important;
         }
 
+        /* Usage box */
         .usage-box {
             border: 1px solid #31415f;
             border-radius: 14px;
@@ -216,6 +267,7 @@ def inject_css() -> None:
             color: #ffffff !important;
         }
 
+        /* Sidebar expanders */
         [data-testid="stExpander"] {
             border-radius: 14px !important;
         }
