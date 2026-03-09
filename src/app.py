@@ -44,7 +44,7 @@ def inject_css() -> None:
     st.markdown(
         """
         <style>
-        :root { --bg: #0b1020; --panel: #12182b; --border: #27314a; --text: #e8ecf7; --muted: #9aa4bf; }
+        :root { --bg: #0b1020; --panel: #12182b; --panel-2: #161d33; --border: #27314a; --text: #e8ecf7; --muted: #9aa4bf; }
         .stApp { background: var(--bg); color: var(--text); }
         [data-testid="stSidebar"] { background: #0f1527; border-right: 1px solid var(--border); }
         [data-testid="stSidebar"] * { color: var(--text); }
@@ -53,6 +53,19 @@ def inject_css() -> None:
             background-color: var(--panel); color: var(--text); border: 1px solid var(--border);
         }
         .app-subtitle { color: var(--muted); margin-top: -0.25rem; margin-bottom: 1rem; font-size: 0.98rem; }
+        
+        /* Custom FAQ Button Styling */
+        div[data-testid="stButton"] button {
+            background-color: var(--panel-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 100%;
+            text-align: left;
+        }
+        div[data-testid="stButton"] button:hover {
+            border-color: #7c8cff;
+            color: #7c8cff;
+        }
         </style>
         """,
         unsafe_allow_html=True
@@ -64,6 +77,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "tracker" not in st.session_state:
     st.session_state.tracker = SessionTracker()
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -74,10 +89,14 @@ with st.sidebar:
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
     st.divider()
+    
+    # 🌟 CRITICAL FIX: The live-updating placeholder for token usage
+    tracker_placeholder = st.empty()
     try:
-        st.markdown(st.session_state.tracker.format_sidebar())
+        tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
     except Exception:
         pass 
+        
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
@@ -86,30 +105,73 @@ with st.sidebar:
 st.title(APP_TITLE)
 st.markdown(f'<p class="app-subtitle">{APP_SUBTITLE}</p>', unsafe_allow_html=True)
 
+# 🌟 NEW UX: FAQ Starter Prompts (Appear only when chat is empty)
+if not st.session_state.messages:
+    st.markdown("### 💡 Frequently Asked Questions")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🏆 Who are the top 10 donors by lifetime giving?"):
+            st.session_state.pending_prompt = "Who are the top 10 donors by lifetime giving?"
+            st.rerun()
+        if st.button("📊 Can you provide a summary of giving statistics?"):
+            st.session_state.pending_prompt = "Can you provide a summary of our giving statistics?"
+            st.rerun()
+    with col2:
+        if st.button("⚠️ Show me lapsed donors who haven't given since 2023"):
+            st.session_state.pending_prompt = "Show me lapsed donors who haven't given since 2023."
+            st.rerun()
+        if st.button("🗺️ Show me the geographic distribution of our donors"):
+            st.session_state.pending_prompt = "Show me the geographic distribution of our donors."
+            st.rerun()
+
+# Render existing messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # --- CHAT INPUT & FILE UPLOADER ---
-with st.container():
-    uploaded_file = st.file_uploader("Upload a donor report (CSV/PDF) for AI analysis", type=['csv', 'pdf', 'txt'])
-    
-    if prompt := st.chat_input("Ask about your donor community..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+# 🌟 NEW UX: accept_file=True puts the '+' icon directly inside the chat bar
+try:
+    prompt_input = st.chat_input("Ask about your donor community...", accept_file=True)
+except TypeError:
+    prompt_input = st.chat_input("Ask about your donor community...")
+    st.info("💡 Tip: To get the '+' file upload icon inside this chat bar, run `pip install --upgrade streamlit`.")
 
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            with st.status("Consulting IASC records...", expanded=True) as status:
-                response, usage = get_response(
-                    user_message=prompt,
-                    conversation_history=st.session_state.messages[:-1],
-                    model=selected_model,
-                    session_tracker=st.session_state.tracker,
-                    attachment=uploaded_file
-                )
-                status.update(label="Complete!", state="complete", expanded=False)
-            
-            response_placeholder.markdown(response)
-            st.session_state.messages.append({"role": "assistant", "content": response})
+active_prompt = None
+uploaded_file = None
+
+if prompt_input:
+    # Streamlit 1.43+ returns a dict-like object. Older versions return a plain string.
+    if isinstance(prompt_input, str):
+        active_prompt = prompt_input
+    else:
+        active_prompt = prompt_input.text
+        uploaded_file = prompt_input.files[0] if prompt_input.files else None
+        if not active_prompt and uploaded_file:
+            active_prompt = f"Please analyze this attached file: {uploaded_file.name}"
+elif st.session_state.pending_prompt:
+    active_prompt = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
+
+if active_prompt:
+    st.session_state.messages.append({"role": "user", "content": active_prompt})
+    with st.chat_message("user"):
+        st.markdown(active_prompt)
+
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        with st.status("Consulting IASC records...", expanded=True) as status:
+            response, usage = get_response(
+                user_message=active_prompt,
+                conversation_history=st.session_state.messages[:-1],
+                model=selected_model,
+                session_tracker=st.session_state.tracker,
+                attachment=uploaded_file
+            )
+            status.update(label="Complete!", state="complete", expanded=False)
+        
+        response_placeholder.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        # 🌟 CRITICAL FIX: Live-update the sidebar tracker immediately
+        tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
