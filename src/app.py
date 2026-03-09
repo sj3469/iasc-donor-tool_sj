@@ -582,5 +582,7 @@ if prompt or uploaded_files:
                 f"Output tokens: {getattr(usage, 'candidates_token_count', 0)}"
             )
 
+            st.rerun()
+
         except Exception as e:
             st.error(f"Request failed: {e}")
