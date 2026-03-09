@@ -23,7 +23,7 @@ DEFAULT_MODEL = getattr(config, "DEFAULT_MODEL", list(AVAILABLE_MODELS.keys())[0
 DB_PATH = root_dir / "data" / "donors.db"
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title=APP_TITLE, page_icon="✨", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
 # --- DATABASE AUTO-BUILDER ---
 if not DB_PATH.exists():
@@ -58,18 +58,19 @@ def convert_to_csv(text):
         return "\n".join(csv_lines).encode('utf-8')
     return text.encode('utf-8')
 
-# --- CSS INJECTION (DARK SIDEBAR + LIGHT MAIN) ---
+# --- CSS INJECTION (MINIMAL, GREY FOCUS, SEAMLESS BOTTOM) ---
 def inject_css() -> None:
     st.markdown(
         """
         <style>
         :root { 
-            --main-bg: #f9fafb; /* Soft light background */
-            --main-text: #111827; /* Dark readable text */
+            --main-bg: #f9fafb; 
+            --main-text: #111827; 
             --border-light: #e5e7eb;
-            --accent-blue: #3b82f6;
+            --accent-blue: #0b57d0;
+            --focus-grey: #9ca3af; /* Soft grey for the text box */
             
-            --sidebar-bg: #0b1020; /* Deep navy */
+            --sidebar-bg: #0b1020; 
             --sidebar-border: #27314a;
             --sidebar-text: #e8ecf7;
         }
@@ -79,7 +80,18 @@ def inject_css() -> None:
         h1, h2, h3, h4, p, span, label, div { color: var(--main-text); }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* Force Sidebar to be Dark */
+        /* Top Navbar (Share & 3 Dots) - Make Icons White */
+        header[data-testid="stHeader"] {
+            background-color: var(--sidebar-bg) !important;
+        }
+        header[data-testid="stHeader"] button, 
+        header[data-testid="stHeader"] svg,
+        header[data-testid="stHeader"] span {
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }
+        
+        /* Sidebar Styling */
         [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
@@ -88,11 +100,13 @@ def inject_css() -> None:
             color: var(--sidebar-text) !important;
         }
         
-        /* Fix Sidebar Dropdowns */
-        [data-testid="stSidebar"] div[data-baseweb="select"] > div {
+        /* Sidebar Dropdowns & Inputs */
+        [data-testid="stSidebar"] div[data-baseweb="select"] > div,
+        [data-testid="stSidebar"] div[data-testid="stTextInput"] input {
             background-color: #12182b !important;
             border-color: var(--sidebar-border) !important;
             color: var(--sidebar-text) !important;
+            border-radius: 8px;
         }
         
         /* Sidebar Button (Clear Chat) */
@@ -106,7 +120,15 @@ def inject_css() -> None:
             color: #ef4444 !important;
         }
 
-        /* Chat Input Box - Clean White Pill */
+        /* Seamless Bottom Chat Background (Aggressive Override) */
+        div[data-testid="stBottom"], 
+        div[data-testid="stBottom"] > div,
+        div[data-testid="stBottom"] > div > div {
+            background-color: var(--main-bg) !important;
+            background: var(--main-bg) !important;
+        }
+
+        /* Chat Input Box - Clean White Pill with Soft Grey Focus */
         div[data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
             border: 1px solid var(--border-light) !important;
@@ -114,26 +136,36 @@ def inject_css() -> None:
             box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
             padding: 0.2rem 0.5rem;
         }
-        div[data-testid="stChatInputContainer"] textarea {
-            color: var(--main-text) !important;
-        }
         div[data-testid="stChatInputContainer"]:focus-within {
-            border-color: var(--accent-blue) !important;
-            box-shadow: 0 0 0 1px var(--accent-blue) !important;
+            border-color: var(--focus-grey) !important;
+            box-shadow: 0 0 0 1px var(--focus-grey) !important;
+            outline: none !important;
         }
 
-        /* Main Area Buttons (FAQ & Downloads) */
-        .st-emotion-cache-1vt4ygl div[data-testid="stButton"] button, 
+        /* Main Area Buttons (FAQ Prompts) - Gemini Style */
         .main div[data-testid="stButton"] button {
-            background-color: #ffffff !important;
-            border: 1px solid var(--border-light) !important;
-            color: var(--main-text) !important;
-            border-radius: 12px !important;
+            background-color: #f0f4f9 !important;
+            border: none !important; 
+            color: #1f1f1f !important;
+            border-radius: 20px !important; 
+            font-weight: 400 !important;
+            padding: 0.5rem 1rem !important;
         }
         .main div[data-testid="stButton"] button:hover {
-            border-color: var(--accent-blue) !important;
+            background-color: #e1e5ea !important;
             color: var(--accent-blue) !important;
-            background-color: #f3f8ff !important;
+        }
+        
+        /* Download Button Styling */
+        .stDownloadButton button {
+            background-color: #ffffff !important;
+            border: 1px solid var(--border-light) !important;
+            border-radius: 8px !important;
+            color: var(--main-text) !important;
+        }
+        .stDownloadButton button:hover {
+            border-color: var(--focus-grey) !important;
+            background-color: #f9fafb !important;
         }
         </style>
         """,
@@ -149,15 +181,23 @@ if "tracker" not in st.session_state:
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Reorganized for Gemini UX) ---
 with st.sidebar:
-    st.title("⚙️ Settings")
-    selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0)
+    selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
+    st.text_input("Search", placeholder="🔍 Search threads...", label_visibility="collapsed")
+    
     st.divider()
-    st.markdown("### 🔍 Quick Filters")
+    
+    st.markdown("### Quick Filters")
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
+    
+    for _ in range(8):
+        st.write("")
+        
     st.divider()
+    
+    st.markdown("<h4 style='font-size: 14px; font-weight: normal; color: #9aa4bf;'>Settings</h4>", unsafe_allow_html=True)
     
     tracker_placeholder = st.empty()
     try:
@@ -175,7 +215,6 @@ st.markdown(f'<p class="app-subtitle">{APP_SUBTITLE}</p>', unsafe_allow_html=Tru
 
 # --- FAQ STARTER PROMPTS ---
 if not st.session_state.messages:
-    st.markdown("### 💡 Frequently Asked Questions")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🏆 Who are the top 10 donors by lifetime donating?"):
@@ -202,8 +241,9 @@ for idx, message in enumerate(st.session_state.messages):
             file_ext = "csv" if is_csv else "txt"
             mime_type = "text/csv" if is_csv else "text/plain"
             
+            # Replaced the emoji with a classic arrow
             st.download_button(
-                label="📥 Download Data",
+                label="⬇ Download Data",
                 data=csv_data,
                 file_name=f"iasc_data_export_{idx}.{file_ext}",
                 mime=mime_type,
