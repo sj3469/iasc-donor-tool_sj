@@ -68,18 +68,18 @@ def inject_css() -> None:
         header,
         header[data-testid="stHeader"],
         [data-testid="stHeader"] {
-            background: #ffffff !important;
+            background: var(--bg) !important;
             border-bottom: 1px solid var(--soft-line) !important;
         }
 
         [data-testid="stDecoration"] {
-            background: #ffffff !important;
+            background: var(--bg) !important;
         }
 
         [data-testid="stHeader"],
         [data-testid="stToolbar"],
         [data-testid="stStatusWidget"] {
-            background: #ffffff !important;
+            background: var(--bg) !important;
             color: var(--navy) !important;
         }
 
