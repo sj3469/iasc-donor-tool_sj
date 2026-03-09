@@ -63,9 +63,8 @@ def scrub_tool_calls(text):
     cleaned = re.sub(r'Tool Call:[\s\S]*?Results:[\s\S]*?\]\n*```?\n*', '', text)
     cleaned = re.sub(r'\*?\*?Tool Call:?\*?\*?[\s\S]*?Results:[\s\S]*?(?=\n\n(?:#|\*|[A-Z])|\Z)', '', cleaned)
     cleaned = re.sub(r'^Here are the top 10 donors by total giving:\n*(?=Top 10 Donors)', '', cleaned, flags=re.IGNORECASE)
-    # Eradicate mentions of database fields
     cleaned = re.sub(r'(?i)^(?:Fields|Columns):\s*.*$', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'(?i)\(Query:.*\)', '', cleaned) # Removes injected SQL queries
+    cleaned = re.sub(r'(?i)\(Query:.*\)', '', cleaned) 
     return cleaned.strip()
 
 # --- BULLETPROOF CSS INJECTION ---
@@ -92,13 +91,40 @@ def inject_css() -> None:
         [data-testid="stAppViewContainer"] h3 { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
 
-        /* 2. Top Navbar */
+        /* 2. FORCING AI TEXT TO BE DARK (The White Text Fix) */
+        [data-testid="stChatMessageContent"] p,
+        [data-testid="stChatMessageContent"] li,
+        [data-testid="stChatMessageContent"] table,
+        [data-testid="stChatMessageContent"] th,
+        [data-testid="stChatMessageContent"] td,
+        [data-testid="stChatMessageContent"] span {
+            color: var(--main-text) !important;
+        }
+        
+        /* Clean Code Blocks */
+        [data-testid="stChatMessageContent"] pre {
+            background-color: #f3f4f6 !important; 
+            border: 1px solid var(--border-light) !important;
+            border-radius: 12px !important;
+        }
+        [data-testid="stChatMessageContent"] code { color: #1f2937 !important; }
+
+        /* 3. Hide Avatars & Fix Assistant Left-Alignment */
+        [data-testid="stChatMessageAvatar"] { display: none !important; }
+        [data-testid="stChatMessage"] {
+            background-color: transparent !important;
+            padding-left: 0 !important; /* Removes the empty space left by the avatar */
+            gap: 0 !important;
+            margin-bottom: 15px !important;
+        }
+
+        /* 4. Top Navbar */
         header[data-testid="stHeader"] { background-color: var(--sidebar-bg) !important; }
         header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg, header[data-testid="stHeader"] span {
             color: #ffffff !important; fill: #ffffff !important;
         }
 
-        /* 3. Sidebar Styling */
+        /* 5. Sidebar Styling */
         [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
@@ -116,7 +142,7 @@ def inject_css() -> None:
         [data-testid="stSidebar"] ul[data-baseweb="menu"] { background-color: #12182b !important; }
         [data-testid="stSidebar"] ul[data-baseweb="menu"] li { color: var(--sidebar-text) !important; }
 
-        /* Small Clear Chat Button under Usage */
+        /* Small Clear Chat Button */
         [data-testid="stSidebar"] div[data-testid="stButton"] button {
             background-color: transparent !important;
             border: 1px solid var(--sidebar-border) !important;
@@ -133,13 +159,13 @@ def inject_css() -> None:
             border-color: #ef4444 !important; color: #ef4444 !important;
         }
 
-        /* 4. Bottom Chat Area */
+        /* 6. Bottom Chat Area */
         [data-testid="stBottom"], [data-testid="stBottom"] > div {
             background-color: var(--main-bg) !important;
             border-top: none !important;
         }
 
-        /* 5. Chat Input Box (White pill, Grey focus) */
+        /* 7. Chat Input Box */
         div[data-testid="stChatInputContainer"] {
             background-color: #ffffff !important;
             border: 1px solid #d1d5db !important;
@@ -158,9 +184,9 @@ def inject_css() -> None:
             background-color: transparent !important;
         }
 
-        /* 6. FAQ Buttons */
+        /* 8. FAQ Buttons */
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button {
-            background-color: #f4f6f8 !important; /* Extremely light grey */
+            background-color: #f4f6f8 !important;
             border: none !important;
             border-radius: 20px !important;
             padding: 10px 20px !important;
@@ -172,24 +198,13 @@ def inject_css() -> None:
             background-color: #e8f0fe !important;
         }
         
-        /* 7. Download Button */
+        /* 9. Download Button */
         .stDownloadButton button {
             background-color: #ffffff !important; border: 1px solid #e5e7eb !important; border-radius: 8px !important;
             margin-top: 10px !important;
             margin-bottom: 20px !important;
         }
         .stDownloadButton button p { color: #111827 !important; }
-        
-        /* General Markdown Table formatting inside Assistant replies */
-        .stMarkdown table {
-            color: #111827 !important;
-        }
-        .stMarkdown pre {
-            background-color: #f3f4f6 !important;
-            border: 1px solid var(--border-light) !important;
-            border-radius: 12px !important;
-        }
-        .stMarkdown code { color: #1f2937 !important; }
         </style>
         """,
         unsafe_allow_html=True
@@ -221,6 +236,7 @@ with st.sidebar:
     except Exception:
         pass 
         
+    st.write("") 
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
@@ -247,14 +263,14 @@ if not st.session_state.messages:
             st.session_state.pending_prompt = "Show me the geographic distribution of our donors."
             st.rerun()
 
-# --- CUSTOM IMESSAGE-STYLE RENDER LOOP (No Avatars, Right/Left Aligned) ---
+# --- CUSTOM IMESSAGE-STYLE RENDER LOOP ---
 for idx, message in enumerate(st.session_state.messages):
     if message["role"] == "user":
-        # Right-aligned ultra-light grey bubble for User
+        # Right-aligned User Bubble (Bypasses st.chat_message entirely)
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-                <div style="background-color: #f4f6f8; color: #111827; padding: 12px 18px; border-radius: 20px 20px 4px 20px; max-width: 75%; font-family: inherit;">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                <div style="background-color: #f4f6f8; color: #111827; padding: 12px 18px; border-radius: 20px 20px 4px 20px; max-width: 75%; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                     {message["content"]}
                 </div>
             </div>
@@ -262,21 +278,20 @@ for idx, message in enumerate(st.session_state.messages):
             unsafe_allow_html=True
         )
     else:
-        # Left-aligned raw text for Assistant
-        st.markdown(f'<div style="color: #111827; margin-bottom: 10px;">', unsafe_allow_html=True)
-        st.markdown(message["content"])
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Download button
-        csv_data = convert_to_csv(message["content"])
-        is_csv = b',' in csv_data and b'\n' in csv_data
-        file_ext = "csv" if is_csv else "txt"
-        mime_type = "text/csv" if is_csv else "text/plain"
-        
-        st.download_button(
-            label="📥 Download Data", data=csv_data,
-            file_name=f"iasc_data_export_{idx}.{file_ext}", mime=mime_type, key=f"dl_btn_{idx}"
-        )
+        # Left-aligned Assistant Text
+        with st.chat_message("assistant"):
+            st.markdown(message["content"])
+            
+            # Add download button to assistant messages
+            csv_data = convert_to_csv(message["content"])
+            is_csv = b',' in csv_data and b'\n' in csv_data
+            file_ext = "csv" if is_csv else "txt"
+            mime_type = "text/csv" if is_csv else "text/plain"
+            
+            st.download_button(
+                label="📥 Download Data", data=csv_data,
+                file_name=f"iasc_data_export_{idx}.{file_ext}", mime=mime_type, key=f"dl_btn_{idx}"
+            )
 
 # --- CHAT INPUT & FILE UPLOADER ---
 supports_chat_attachments = "accept_file" in inspect.signature(st.chat_input).parameters
@@ -313,11 +328,11 @@ if st.session_state.pending_prompt:
 if active_prompt:
     st.session_state.messages.append({"role": "user", "content": active_prompt})
     
-    # Render the user bubble immediately so it feels responsive
+    # Draw user bubble immediately for fast UI feel
     st.markdown(
         f"""
-        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-            <div style="background-color: #f4f6f8; color: #111827; padding: 12px 18px; border-radius: 20px 20px 4px 20px; max-width: 75%; font-family: inherit;">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+            <div style="background-color: #f4f6f8; color: #111827; padding: 12px 18px; border-radius: 20px 20px 4px 20px; max-width: 75%; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
                 {active_prompt}
             </div>
         </div>
@@ -325,23 +340,27 @@ if active_prompt:
         unsafe_allow_html=True
     )
 
-    # Use a raw spinner instead of st.chat_message
-    with st.spinner("Consulting IASC records..."):
-        
-        hidden_instruction = "\n\n[CRITICAL INSTRUCTIONS: 1. Do NOT output 'Tool Call:', 'Results:', or raw JSON. 2. Do NOT mention 'fields', 'columns', or database schema details. 3. Output the final data directly in a clean, professional format.]"
-        enhanced_prompt = active_prompt + hidden_instruction
+    with st.chat_message("assistant"):
+        response_placeholder = st.empty()
+        with st.status("Consulting IASC records...", expanded=True) as status:
+            
+            # The Ultimate Hidden Prompt
+            hidden_instruction = "\n\n[CRITICAL INSTRUCTIONS: 1. Do NOT output 'Tool Call:', 'Results:', or raw JSON. 2. Do NOT mention 'fields', 'columns', or database schema details. 3. Output the final data directly in a clean, professional format.]"
+            enhanced_prompt = active_prompt + hidden_instruction
 
-        raw_response, usage = get_response(
-            user_message=enhanced_prompt,
-            conversation_history=st.session_state.messages[:-1],
-            model=selected_model,
-            session_tracker=st.session_state.tracker,
-            attachment=uploaded_file
-        )
+            raw_response, usage = get_response(
+                user_message=enhanced_prompt,
+                conversation_history=st.session_state.messages[:-1],
+                model=selected_model,
+                session_tracker=st.session_state.tracker,
+                attachment=uploaded_file
+            )
+            
+            clean_response_text = scrub_tool_calls(raw_response)
+            status.update(label="Complete!", state="complete", expanded=False)
         
-        clean_response_text = scrub_tool_calls(raw_response)
-    
-    # Append the assistant's clean message and rerun to render properly
-    st.session_state.messages.append({"role": "assistant", "content": clean_response_text})
-    st.session_state.tracker.format_sidebar()
-    st.rerun()
+        response_placeholder.markdown(clean_response_text)
+        st.session_state.messages.append({"role": "assistant", "content": clean_response_text})
+        
+        tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
+        st.rerun()
