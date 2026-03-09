@@ -3,49 +3,38 @@ import os
 import sys
 from pathlib import Path
 
-# --- THE PATH BRIDGE [CRITICAL FIX] ---
-# This ensures Streamlit sees all files in your 'src' folder
-current_dir = Path(__file__).parent
+# Fix for Streamlit Cloud imports
+current_dir = Path(__file__).resolve().parent
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
 
-# Now these imports will work
 from config import APP_TITLE, APP_SUBTITLE, AVAILABLE_MODELS, DEFAULT_MODEL
 from llm import get_response
 from token_tracker import SessionTokenTracker
 
-# 1. Page Configuration [Restores missing titles]
 st.set_page_config(page_title=APP_TITLE, page_icon="📊", layout="wide")
 
-# 2. Initialize Session States
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "tracker" not in st.session_state:
     st.session_state.tracker = SessionTokenTracker()
 
-# 3. Sidebar UI
 with st.sidebar:
     st.title("⚙️ Settings")
-    selected_model = st.selectbox(
-        "Select Model", 
-        list(AVAILABLE_MODELS.keys()), 
-        format_func=lambda x: AVAILABLE_MODELS[x], 
-        index=list(AVAILABLE_MODELS.keys()).index(DEFAULT_MODEL)
-    )
+    selected_model = st.selectbox("Select Model", list(AVAILABLE_MODELS.keys()), 
+                                  format_func=lambda x: AVAILABLE_MODELS[x])
     
     st.divider()
-    st.markdown("### 📁 Data Source")
-    st.info("Connected: `IASC Donor Database`")
+    # This displays the stats from your token_tracker.py
+    st.markdown(st.session_state.tracker.format_sidebar())
     
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
 
-# 4. Main UI Header [Restores your missing text]
 st.title(APP_TITLE)
 st.subheader(APP_SUBTITLE)
 
-# 5. Chat Interface
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -57,7 +46,7 @@ if prompt := st.chat_input("Ask about your donor community..."):
 
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
-        with st.status("Consulting IASC records...", expanded=True) as status:
+        with st.status("Analyzing database...", expanded=True) as status:
             response, usage = get_response(
                 user_message=prompt,
                 conversation_history=st.session_state.messages[:-1],
