@@ -48,4 +48,3 @@ def get_knowledge_token_estimate() -> int:
         if filepath.exists():
             total_words += len(filepath.read_text(encoding="utf-8").split())
     return int(total_words * 0.75)
-
