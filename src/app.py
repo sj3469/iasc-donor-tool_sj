@@ -46,6 +46,8 @@ def inject_css() -> None:
             --sidebar-text: #ffffff;
             --sidebar-muted: #eef3ff;
             --sidebar-line: #e8edf7;
+            --navy: #0f1728;
+            --soft-line: #e8edf7;
         }
 
         html, body, [class*="css"] {
@@ -55,6 +57,37 @@ def inject_css() -> None:
         .stApp {
             background: var(--bg);
             color: var(--text);
+        }
+
+        .stApp > header {
+            background: #ffffff !important;
+        }
+
+        header[data-testid="stHeader"] {
+            background: #ffffff !important;
+            border-bottom: 1px solid var(--soft-line) !important;
+        }
+
+        [data-testid="stHeader"] * {
+            color: var(--navy) !important;
+            fill: var(--navy) !important;
+        }
+
+        [data-testid="stToolbar"] * {
+            color: var(--navy) !important;
+            fill: var(--navy) !important;
+        }
+
+        [data-testid="stDecoration"] {
+            background: #ffffff !important;
+        }
+
+        button[kind="header"] {
+            color: var(--navy) !important;
+        }
+
+        button[kind="header"] svg {
+            fill: var(--navy) !important;
         }
 
         [data-testid="stSidebar"] {
@@ -167,23 +200,33 @@ def inject_css() -> None:
 
         div[data-testid="stChatInput"] > div {
             background: var(--panel) !important;
-            border: none !important;
-            outline: none !important;
-            border-radius: 18px !important;
+            border: 1px solid transparent !important;
+            border-radius: 22px !important;
+            box-shadow: none !important;
+        }
+
+        div[data-testid="stChatInput"] > div:focus-within {
+            border: 1px solid transparent !important;
             box-shadow: none !important;
         }
 
         div[data-testid="stChatInput"] textarea {
             color: var(--text) !important;
+            background: transparent !important;
             border: none !important;
-            box-shadow: none !important;
             outline: none !important;
+            box-shadow: none !important;
+        }
+
+        div[data-testid="stChatInput"] textarea::placeholder {
+            color: #6c7892 !important;
+            opacity: 1 !important;
         }
 
         div[data-testid="stChatInput"] textarea:focus {
             border: none !important;
-            box-shadow: none !important;
             outline: none !important;
+            box-shadow: none !important;
         }
 
         .usage-box {
@@ -477,110 +520,3 @@ with st.sidebar:
         state_options,
         index=0,
     )
-
-    st.divider()
-
-    st.markdown("#### FAQ")
-    with st.expander("What can I ask here?"):
-        st.markdown(
-            "- Show top donors overall\n"
-            "- Show top donors in VA\n"
-            "- Show top donors in New York\n"
-            "- Show top donors in ZIP 10027\n"
-            "- Find lapsed donors worth re-engaging\n"
-            "- Identify high-potential prospects\n"
-            "- Summarize geographic donor distribution\n"
-            "- Show summary by state\n"
-            "- Plan a fundraising trip in DC\n"
-            "- Show donor 003XXXXXXXXXXXXXXX"
-        )
-
-    with st.expander("How do filters work?"):
-        st.markdown(
-            "Filters act as default constraints for broad queries. "
-            "If you ask for a different state or segment explicitly, your prompt should override the sidebar defaults."
-        )
-
-    st.divider()
-
-    spent, remaining = session_spend_and_remaining()
-    st.markdown("#### Session usage")
-    st.markdown(
-        f"""
-        <div class="usage-box">
-            <div>Questions: {len(st.session_state.tracker.responses)}</div>
-            <div>API calls: {st.session_state.tracker.total_api_calls}</div>
-            <div>Input tokens: {st.session_state.tracker.total_input_tokens:,}</div>
-            <div>Output tokens: {st.session_state.tracker.total_output_tokens:,}</div>
-            <div>Spent: ${spent:.4f}</div>
-            <div>Left: ${remaining:.4f}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-thread = get_active_thread()
-
-st.title(APP_TITLE)
-st.markdown(f'<div class="app-subtitle">{APP_SUBTITLE}</div>', unsafe_allow_html=True)
-st.markdown(
-    f'<div class="model-chip">Model: {AVAILABLE_MODELS.get(selected_model, selected_model)}</div>',
-    unsafe_allow_html=True,
-)
-st.markdown(f'<div class="thread-heading">{thread["title"]}</div>', unsafe_allow_html=True)
-st.markdown(
-    f'<div class="thread-meta">Thread updated: {thread.get("updated_at", "")}</div>',
-    unsafe_allow_html=True,
-)
-
-for message in thread["messages"]:
-    render_message(message)
-
-submission = st.chat_input(
-    "Ask about your donor community...",
-    accept_file="multiple",
-    file_type=["png", "jpg", "jpeg", "pdf", "txt", "csv"],
-    key="main_chat_input",
-)
-
-prompt, uploaded_files = parse_chat_submission(submission)
-
-if prompt or uploaded_files:
-    attachment_names = [f.name for f in uploaded_files]
-    effective_prompt = build_effective_prompt(prompt, donor_status_filter, state_filter) if prompt else ""
-
-    user_display = prompt if prompt else "[Files uploaded]"
-    add_message("user", user_display, attachments=attachment_names)
-
-    with st.chat_message("user"):
-        if prompt:
-            st.markdown(prompt)
-        else:
-            st.markdown("[Files uploaded]")
-        if attachment_names:
-            st.caption("Attached: " + ", ".join(attachment_names))
-
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
-
-        try:
-            with st.status("Analyzing donor database...", expanded=True) as status:
-                response, usage = get_response(
-                    user_message=effective_prompt if prompt else "Please analyze the attached files if relevant.",
-                    conversation_history=thread["messages"][:-1],
-                    model=selected_model,
-                    session_tracker=st.session_state.tracker,
-                    attachment=uploaded_files,
-                )
-                status.update(label="Analysis complete", state="complete", expanded=False)
-
-            response_placeholder.text(response)
-            add_message("assistant", response)
-
-            st.caption(
-                f"Prompt tokens: {getattr(usage, 'prompt_token_count', 0)} | "
-                f"Output tokens: {getattr(usage, 'candidates_token_count', 0)}"
-            )
-
-        except Exception as e:
-            st.error(f"Request failed: {e}")
