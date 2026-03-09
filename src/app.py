@@ -80,15 +80,27 @@ def inject_css() -> None:
         [data-testid="stAppViewContainer"] h3 { color: var(--main-text) !important; }
         .app-subtitle { color: #6b7280 !important; margin-top: -0.25rem; margin-bottom: 2rem; font-size: 0.95rem; }
         
-        /* 🔥 FIX: Force Chat Messages to be Dark Text */
+        /* 2. FORCE Chat Messages & Code Blocks to be Light Background / Dark Text */
         [data-testid="stChatMessageContent"] p, 
         [data-testid="stChatMessageContent"] span, 
         [data-testid="stChatMessageContent"] li, 
         [data-testid="stChatMessageContent"] div {
             color: var(--main-text) !important;
         }
+        /* Defeat the Black Box for Code/SQL */
+        [data-testid="stChatMessageContent"] pre {
+            background-color: #f3f4f6 !important; /* Soft light grey */
+            border: 1px solid var(--border-light) !important;
+            border-radius: 12px !important;
+            padding: 1rem !important;
+        }
+        [data-testid="stChatMessageContent"] code {
+            color: #1f2937 !important; /* Dark text */
+            background-color: transparent !important;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+        }
 
-        /* 2. Top Navbar (Dark Background, White Icons) */
+        /* 3. Top Navbar (Dark Background, White Icons) */
         header[data-testid="stHeader"] { 
             background-color: var(--sidebar-bg) !important; 
         }
@@ -99,7 +111,7 @@ def inject_css() -> None:
             fill: #ffffff !important;
         }
 
-        /* 3. Sidebar Styling (Force Dark Background & Bright Text) */
+        /* 4. Sidebar Styling (Force Dark Background & Bright Text) */
         [data-testid="stSidebar"] {
             background-color: var(--sidebar-bg) !important;
             border-right: 1px solid var(--sidebar-border) !important;
@@ -126,7 +138,24 @@ def inject_css() -> None:
             color: var(--sidebar-text) !important;
         }
 
-        /* 4. Bottom Chat Area (Force absolute white background) */
+        /* Small, Subtle "Clear Chat" Button under Session Usage */
+        [data-testid="stSidebar"] div[data-testid="stButton"] button {
+            background-color: transparent !important;
+            border: 1px solid var(--sidebar-border) !important;
+            color: #9ca3af !important; /* Muted grey */
+            border-radius: 6px !important;
+            padding: 2px 12px !important;
+            font-size: 0.85rem !important;
+            min-height: 32px !important;
+            width: auto !important; /* Prevents it from stretching */
+            display: inline-flex !important;
+        }
+        [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+            border-color: #ef4444 !important;
+            color: #ef4444 !important;
+        }
+
+        /* 5. Bottom Chat Area (Force absolute white background) */
         [data-testid="stBottom"], 
         [data-testid="stBottom"] > div,
         [data-testid="stBottom"] > div > div {
@@ -135,7 +164,7 @@ def inject_css() -> None:
             border-top: none !important;
         }
 
-        /* 5. Chat Input Box (Force White Pill, Grey Focus) */
+        /* 6. Chat Input Box (Force White Pill, Grey Focus) */
         div[data-testid="stChatInput"] { 
             background-color: transparent !important; 
         }
@@ -161,7 +190,7 @@ def inject_css() -> None:
             color: #6b7280 !important;
         }
 
-        /* 6. FAQ Buttons */
+        /* 7. FAQ Buttons */
         [data-testid="stAppViewContainer"] div[data-testid="stButton"] button {
             background-color: #f0f4f9 !important;
             border: none !important;
@@ -179,14 +208,13 @@ def inject_css() -> None:
             color: var(--accent-blue) !important;
         }
         
-        /* 7. Download Button & Clear Chat */
-        .stDownloadButton button, [data-testid="stSidebar"] div[data-testid="stButton"] button {
-            background-color: transparent !important;
-            border: 1px solid var(--sidebar-border) !important;
+        /* 8. Download Button */
+        .stDownloadButton button {
+            background-color: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
             border-radius: 8px !important;
         }
         .stDownloadButton button p { color: #111827 !important; }
-        .stDownloadButton button { border: 1px solid #e5e7eb !important; background-color: #ffffff !important; }
         </style>
         """,
         unsafe_allow_html=True
@@ -201,10 +229,10 @@ if "tracker" not in st.session_state:
 if "pending_prompt" not in st.session_state:
     st.session_state.pending_prompt = None
 
-# --- SIDEBAR (Reorganized & Cleaned Up) ---
+# --- SIDEBAR (Reorganized) ---
 with st.sidebar:
-    # 1. Search at the very top (Collapse icon is natively above this)
-    st.text_input("Search", placeholder="🔍 Search threads...", label_visibility="collapsed")
+    # 1. Search at the very top 
+    st.text_input("Search", placeholder="Search chats (⇧⌘K)", label_visibility="collapsed")
     
     # 2. Model Selection
     selected_model = st.selectbox("Model", list(AVAILABLE_MODELS.keys()), index=0, label_visibility="collapsed")
@@ -212,27 +240,20 @@ with st.sidebar:
     st.divider()
     
     # 3. Quick Filters
-    st.markdown("<h4 style='color: #ffffff;'>Quick Filters</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='color: #ffffff; margin-bottom: 10px;'>Quick Filters</h4>", unsafe_allow_html=True)
     donor_status = st.selectbox("Donor Status", ["All", "Active", "Lapsed", "Prospect"])
     state_filter = st.selectbox("State", ["All", "VA", "NY", "CA", "TX"])
     
     st.divider()
     
-    # 4. Session Usage (Directly below filters)
+    # 4. Session Usage & Clear Chat Button
     tracker_placeholder = st.empty()
     try:
         tracker_placeholder.markdown(st.session_state.tracker.format_sidebar())
     except Exception:
         pass 
         
-    # Spacer to push settings to the absolute bottom
-    for _ in range(10):
-        st.write("")
-        
-    st.divider()
-    
-    # 5. Settings (Minimal, no emoji, at the bottom)
-    st.markdown("<div style='font-size: 14px; color: #ffffff; padding-bottom: 8px;'>Settings</div>", unsafe_allow_html=True)
+    st.write("") # Tiny spacer
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
