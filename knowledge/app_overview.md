@@ -71,8 +71,8 @@ Select the model in the sidebar under Settings:
 |---|---|---|---|
 | **GPT-5.4 mini** (default) | Fast | Cheapest | Most queries |
 | GPT-5.4 | Fast | Moderate | Complex analysis |
-| Claude Sonnet | Moderate | Moderate | Alternative for complex queries |
-| Claude Haiku | Fast | Cheap | Development and testing |
+| Claude Sonnet 4.6 | Moderate | Moderate | Alternative for complex queries |
+| Claude Haiku 4.5 | Fast | Cheap | Development and testing |
 
 GPT models require an `OPENAI_API_KEY`; Claude models require an `ANTHROPIC_API_KEY`.
 
