@@ -48,6 +48,31 @@ def _rows_to_dicts(rows: list) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+# Maps common city aliases/abbreviations to the canonical name stored in the DB.
+# LLMs (especially smaller ones) often pass "NYC" or "New York City" instead of
+# "New York", causing LIKE filters to return zero results.
+_CITY_ALIASES: dict[str, str] = {
+    "nyc": "New York",
+    "new york city": "New York",
+    "new york, ny": "New York",
+    "dc": "Washington",
+    "washington dc": "Washington",
+    "washington d.c.": "Washington",
+    "washington, dc": "Washington",
+    "la": "Los Angeles",
+    "l.a.": "Los Angeles",
+    "sf": "San Francisco",
+    "s.f.": "San Francisco",
+}
+
+
+def _normalize_city(city: Optional[str]) -> Optional[str]:
+    """Resolve common city abbreviations/aliases to the canonical DB name."""
+    if city is None:
+        return None
+    return _CITY_ALIASES.get(city.strip().lower(), city)
+
+
 # ---------------------------------------------------------------------------
 # Public query functions
 # ---------------------------------------------------------------------------
@@ -116,7 +141,7 @@ def search_donors(
 
     if city is not None:
         conditions.append("city LIKE ?")
-        params.append(f"%{city}%")
+        params.append(f"%{_normalize_city(city)}%")
 
     if zip_prefix is not None:
         conditions.append("zip_code LIKE ?")
@@ -617,7 +642,7 @@ def plan_fundraising_trip(
 
     if target_city is not None:
         conditions.append("city LIKE ?")
-        params.append(f"%{target_city}%")
+        params.append(f"%{_normalize_city(target_city)}%")
 
     if target_zip_prefix is not None:
         conditions.append("zip_code LIKE ?")
