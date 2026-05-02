@@ -1,6 +1,6 @@
 # IASC Donor Analytics
 
-An AI-powered donor intelligence prototype for the Institute for Advanced Studies in Culture (IASC), a nonprofit research center and publisher at the University of Virginia. The tool lets a development team ask natural language questions about their donor database — "Which lapsed donors in Virginia gave more than $5,000?", "Plan a fundraising trip to NYC", "Who are our highest-potential prospects?" — and receive data-grounded, actionable answers. Claude (Anthropic) handles intent parsing and response synthesis; Python functions query a SQLite database and return structured results; a curated knowledge base of fundraising best practices is injected into the system prompt so every answer is informed by domain expertise.
+An AI-powered donor intelligence prototype for the Institute for Advanced Studies in Culture (IASC), a nonprofit research center and publisher at the University of Virginia. The tool lets a development team ask natural language questions about their donor database — "Which lapsed donors in Virginia gave more than $5,000?", "Plan a fundraising trip to NYC", "Who are our highest-potential prospects?" — and receive data-grounded, actionable answers. An LLM (Claude or GPT, selectable in the sidebar) handles intent parsing and response synthesis; Python functions query a SQLite database and return structured results; a curated knowledge base of fundraising best practices is injected into the system prompt so every answer is informed by domain expertise.
 
 > **This repository uses entirely synthetic data.** The donor database is generated procedurally by `data/generate_mock_data.py` and contains no real names, contact information, giving history, or any other actual IASC data. No real donor data has ever been committed to this repository.
 
@@ -15,9 +15,11 @@ cd iasc-donor-tool
 # Install dependencies (Python 3.11+ required)
 pip install -r requirements.txt
 
-# Set your Anthropic API key
+# Set your API key(s)
 cp .env.example .env
-# Open .env and set: ANTHROPIC_API_KEY=sk-ant-...
+# Open .env and set at least one of:
+#   ANTHROPIC_API_KEY=sk-ant-...   (required for Claude models)
+#   OPENAI_API_KEY=sk-...          (required for GPT models)
 
 # Generate the mock donor database (300 synthetic records)
 python data/generate_mock_data.py
@@ -34,8 +36,9 @@ The app will open in your browser at `http://localhost:8501`.
 
 1. Click the green **Code** button on the repo page, then **Codespaces > New codespace**.
 2. Wait for the environment to build (about 2 minutes the first time).
-3. Add your Anthropic API key as a Codespaces secret: go to github.com > Settings > Codespaces > Secrets,
-   create a secret named `ANTHROPIC_API_KEY`, and set its value to your key. Grant it access to this repo.
+3. Add your API key(s) as Codespaces secrets: go to github.com > Settings > Codespaces > Secrets.
+   Create `ANTHROPIC_API_KEY` (for Claude models) and/or `OPENAI_API_KEY` (for GPT models),
+   and grant each secret access to this repo. You need at least one key.
 4. In the Codespace terminal, run: `streamlit run src/app.py`
 5. When prompted, click **Open in Browser** to view the app.
 
@@ -47,13 +50,18 @@ You do not need to run `generate_mock_data.py` manually.
 1. Fork this repo to your own GitHub account.
 2. Go to share.streamlit.io and connect your GitHub account.
 3. Create a new app, pointing to `src/app.py` in your fork.
-4. Under **Advanced settings > Secrets**, paste the contents of `.streamlit/secrets.toml.example`
-   and replace the placeholder with your real API key.
+4. Under **Advanced settings > Secrets**, add your API key(s):
+   ```toml
+   ANTHROPIC_API_KEY = "sk-ant-your-key-here"   # for Claude models
+   OPENAI_API_KEY = "sk-your-openai-key-here"   # for GPT models
+   ```
+   You need at least one. The default model is GPT-5.4 mini, so `OPENAI_API_KEY` is required
+   unless you switch the default in `src/config.py`.
 5. Click **Deploy**. The mock database will be generated automatically on first startup.
 
 Note: do not use real donor data with this deployment. The app has no authentication.
 
-**To rotate the API key after initial deployment:** go to https://share.streamlit.io, find the app, click the three-dot menu (⋮) on the right > **Settings** > **Secrets**, and update the value to the new key in the format `ANTHROPIC_API_KEY = "sk-ant-..."`  . The app will restart automatically.
+**To rotate a key after initial deployment:** go to https://share.streamlit.io, find the app, click the three-dot menu (⋮) > **Settings** > **Secrets**, and update the value. The app will restart automatically.
 
 ---
 
@@ -67,7 +75,7 @@ Note: do not use real donor data with this deployment. The app has no authentica
 
 **Token usage:** Every assistant response displays an inline usage line below it showing the model used, number of API calls, input/output token counts, estimated cost, and latency. The sidebar accumulates session totals so you can track your spending across a full session.
 
-**Model selection:** Use the Settings section in the sidebar to switch between Claude Sonnet (the default, recommended for production quality) and Claude Haiku (faster and cheaper, useful for development and testing).
+**Model selection:** Use the Settings section in the sidebar to switch between models. The default is **GPT-5.4 mini** (fast and cheap). Other options: GPT-5.4 (higher quality), Claude Sonnet, and Claude Haiku. GPT models require `OPENAI_API_KEY`; Claude models require `ANTHROPIC_API_KEY`.
 
 **Clear conversation:** The "Clear conversation" button at the bottom of the sidebar resets both the chat history and the session token tracker.
 
@@ -79,7 +87,7 @@ Note: do not use real donor data with this deployment. The app has no authentica
 User question (Streamlit chat)
         |
         v
-Claude API (Sonnet) with tool use
+LLM API (Claude or GPT, selectable) with tool use
         |                    \
         v                     v
 Python functions that     Knowledge base
@@ -87,10 +95,10 @@ query SQLite/pandas       (fundraising best practices,
         |                  injected into system prompt)
         v                     |
 Query results returned ------/
-to Claude
+to LLM
         |
         v
-Claude generates natural language response
+LLM generates natural language response
 with data citations + best practice guidance
         |
         v
@@ -103,7 +111,7 @@ Displayed in Streamlit UI
 - **Tool use, not RAG:** Donor data is tabular and well-structured. Claude decides which filters and operations to apply; Python executes parameterized SQL queries. This is more reliable and cheaper than embedding donor records.
 - **Knowledge base injection:** Fundraising best practices and IASC-specific context are loaded as markdown and appended to the system prompt on every call. This is simple, transparent, and easy to extend.
 - **Token tracking:** Every API call is timed and counted. Costs are displayed inline so users develop intuition for what different query types cost.
-- **No LangChain or LlamaIndex:** The tool use loop is implemented directly with the Anthropic SDK. This is intentional — the code is easier to read, debug, and teach.
+- **No LangChain or LlamaIndex:** The tool use loop is implemented directly with the Anthropic and OpenAI SDKs. This is intentional — the code is easier to read, debug, and teach. Both providers share the same tool definitions and query functions; only the API call format differs.
 
 ---
 
@@ -125,7 +133,7 @@ iasc-donor-tool/
 │   └── README.md                      # How the knowledge base works
 ├── src/
 │   ├── app.py                 # Main Streamlit application
-│   ├── llm.py                 # Claude API integration and tool definitions
+│   ├── llm.py                 # LLM integration (Claude + OpenAI) and tool definitions
 │   ├── queries.py             # Data query functions (the "tools" Claude can call)
 │   ├── knowledge.py           # Knowledge base loader and formatter
 │   ├── prompts.py             # System prompts and prompt templates
@@ -162,15 +170,15 @@ The test suite requires `data/donors.db` to exist. If it does not, the query tes
 
 ## Cost estimates
 
-| Scenario | Approximate cost |
-|---|---|
-| Single query (Sonnet, with tool use) | $0.01 – $0.05 |
-| Full behavioral test suite | $0.10 – $0.50 |
-| Typical 30-minute session | $0.50 – $2.00 |
+| Scenario | GPT-5.4 mini (default) | Claude Sonnet |
+|---|---|---|
+| Single query with tool use | ~$0.003 – $0.01 | $0.01 – $0.05 |
+| Full behavioral test suite | ~$0.03 – $0.15 | $0.10 – $0.50 |
+| Typical 30-minute session | ~$0.10 – $0.50 | $0.50 – $2.00 |
 
 The system prompt (base instructions + schema summary + knowledge base) consumes approximately 3,000 – 4,000 tokens on every API call. This is the dominant cost for short queries. The knowledge base token estimate is displayed in the sidebar.
 
-Using Haiku instead of Sonnet reduces costs by roughly 75-80% at the expense of response quality. Switch to Haiku in the sidebar for development and back to Sonnet for demos and evaluations.
+GPT-5.4 mini ($0.75/$4.50 per MTok in/out) is the default and cheapest option. GPT-5.4 ($2.50/$15.00) offers higher quality at moderate cost. Claude Sonnet ($3.00/$15.00) is comparable to GPT-5.4. Claude Haiku ($0.80/$4.00) is the cheapest Claude option. Every response shows the exact cost in the inline usage line.
 
 ---
 
