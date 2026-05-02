@@ -282,7 +282,7 @@ def _get_response_openai(
             try:
                 response = client.chat.completions.create(
                     model=model,
-                    max_tokens=4096,
+                    max_completion_tokens=4096,
                     tools=openai_tools,
                     messages=messages,
                 )
