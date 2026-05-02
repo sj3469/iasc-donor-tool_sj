@@ -382,7 +382,7 @@ def round_to_nice_amount(amount: float) -> float:
 def power_law_total_gifts_v2() -> float:
     """
     Gift distribution calibrated for a small nonprofit.
-    For ~5000 contacts targets approximately:
+    For ~10000 contacts targets approximately:
     - ~15 major donors (>$100K)
     - ~25 significant donors ($10K-$100K)
     - ~100 mid-level donors ($1K-$10K)
@@ -537,7 +537,7 @@ def derive_foundation_status(total_gifts: float | None, donor_status: str) -> st
 # ---------------------------------------------------------------------------
 
 def generate_contacts(
-    n: int = 5000,
+    n: int = 10000,
     prospect_pct: float = 0.55,
     active_pct: float = 0.08,
     lapsed_pct: float = 0.25,
@@ -1507,7 +1507,7 @@ def print_summary(
 # ---------------------------------------------------------------------------
 
 def generate_dataset(
-    num_contacts: int = 5000,
+    num_contacts: int = 10000,
     seed: int = 42,
     prospect_pct: float = 0.55,
     active_pct: float = 0.08,
@@ -1584,7 +1584,7 @@ def _parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--num-contacts", type=int, default=5000,
+        "--num-contacts", type=int, default=10000,
         help="Number of contact records to generate.",
     )
     parser.add_argument(

@@ -55,7 +55,7 @@ The LLM has access to eight query functions:
 
 ## Data
 
-The database contains ~5,000 synthetic donor records with fields drawn from three real IASC data sources:
+The database contains ~10,000 synthetic donor records with fields drawn from three real IASC data sources:
 
 - **Salesforce:** contact info, gift dates and amounts, donor status, giving vehicle
 - **MailChimp:** subscription type/status, email open rate, last click date
