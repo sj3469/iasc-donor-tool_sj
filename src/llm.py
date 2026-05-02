@@ -257,7 +257,7 @@ def _get_response_openai(
     - Token counts are in response.usage.prompt_tokens / completion_tokens.
     - finish_reason is 'tool_calls' (not 'tool_use') when tools are requested.
     """
-    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    client = openai.OpenAI(api_key=OPENAI_API_KEY, base_url="https://us.api.openai.com/v1")
     openai_tools = _make_openai_tools()
 
     def update_progress(msg: str):
