@@ -12,17 +12,57 @@ from datetime import datetime
 
 
 # Pricing as of early 2025; update these if pricing changes.
-# Source: anthropic.com/pricing
+# Sources: anthropic.com/pricing, openai.com/pricing
 MODEL_PRICING = {
+    "gpt-5.5-pro": {
+        "input_per_mtok": 30.00,
+        "output_per_mtok": 180.00,
+        "display_name": "GPT-5.5 Pro",
+    },
+    "gpt-5.5": {
+        "input_per_mtok": 5.00,
+        "output_per_mtok": 30.00,
+        "display_name": "GPT-5.5",
+    },
+    "gpt-5.4-pro": {
+        "input_per_mtok": 30.00,
+        "output_per_mtok": 180.00,
+        "display_name": "GPT-5.4 Pro",
+    },
+    "gpt-5.4": {
+        "input_per_mtok": 2.50,
+        "output_per_mtok": 15.00,
+        "display_name": "GPT-5.4",
+    },
+    "gpt-5.4-mini": {
+        "input_per_mtok": 0.75,
+        "output_per_mtok": 4.50,
+        "display_name": "GPT-5.4 mini",
+    },
+    "gpt-5.4-nano": {
+        "input_per_mtok": 0.20,
+        "output_per_mtok": 1.25,
+        "display_name": "GPT-5.4 nano",
+    },
     "claude-sonnet-4-20250514": {
         "input_per_mtok": 3.00,
         "output_per_mtok": 15.00,
-        "display_name": "Sonnet",
+        "display_name": "Claude Sonnet",
     },
     "claude-haiku-4-5-20251001": {
         "input_per_mtok": 0.80,
         "output_per_mtok": 4.00,
-        "display_name": "Haiku",
+        "display_name": "Claude Haiku",
+    },
+    "gpt-4o": {
+        "input_per_mtok": 2.50,
+        "output_per_mtok": 10.00,
+        "display_name": "GPT-4o",
+    },
+    "gpt-4o-mini": {
+        "input_per_mtok": 0.15,
+        "output_per_mtok": 0.60,
+        "display_name": "GPT-4o mini",
     },
 }
 
@@ -81,7 +121,7 @@ class ResponseUsage:
         Cache reads:  0.10x normal input rate
         Regular input: 1.00x normal input rate
         """
-        pricing = MODEL_PRICING.get(model, MODEL_PRICING["claude-sonnet-4-20250514"])
+        pricing = MODEL_PRICING.get(model) or MODEL_PRICING["claude-sonnet-4-20250514"]
         base_rate = pricing["input_per_mtok"]
 
         total_cost = 0.0
@@ -105,7 +145,7 @@ class ResponseUsage:
     def format_inline(self, model: str) -> str:
         """Format for display below a chat response."""
         cost = self.estimated_cost(model)
-        pricing = MODEL_PRICING.get(model, MODEL_PRICING["claude-sonnet-4-20250514"])
+        pricing = MODEL_PRICING.get(model) or MODEL_PRICING["claude-sonnet-4-20250514"]
         model_name = pricing["display_name"]
         cache_info = ""
         if self.total_cache_read_tokens > 0:

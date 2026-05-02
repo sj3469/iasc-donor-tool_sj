@@ -14,10 +14,11 @@ from datetime import datetime
 from typing import Optional, Callable
 
 import anthropic
+import openai
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import DEFAULT_MODEL, MAX_TOOL_CALLS_PER_TURN
+from config import DEFAULT_MODEL, MAX_TOOL_CALLS_PER_TURN, OPENAI_API_KEY
 from prompts import build_system_prompt, needs_knowledge_base
 from token_tracker import APICall, ResponseUsage, SessionTracker
 from usage_store import log_api_call, get_usage_summary
@@ -159,6 +160,33 @@ TOOLS = [
     },
 ]
 
+# ─── Provider detection ───────────────────────────────────────────────────────
+
+def _is_openai_model(model: str) -> bool:
+    """Return True if the model ID belongs to OpenAI (e.g. 'gpt-4o')."""
+    return model.startswith("gpt-")
+
+
+def _make_openai_tools() -> list[dict]:
+    """Convert the shared TOOLS list from Anthropic format to OpenAI function-calling format.
+
+    Anthropic uses 'input_schema'; OpenAI wraps everything in a 'function' key
+    and calls the schema field 'parameters'. We also drop 'cache_control', which
+    is Anthropic-specific.
+    """
+    openai_tools = []
+    for tool in TOOLS:
+        openai_tools.append({
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["input_schema"],
+            },
+        })
+    return openai_tools
+
+
 # ─── Tool execution ───────────────────────────────────────────────────────────
 
 TOOL_FUNCTIONS = {
@@ -209,6 +237,147 @@ def _summarize_tool_params(tool_name: str, params: dict) -> str:
 
 MAX_RETRIES = 3
 
+# ─── OpenAI conversation loop ─────────────────────────────────────────────────
+
+def _get_response_openai(
+    user_message: str,
+    conversation_history: list[dict],
+    model: str,
+    system_prompt: str,
+    session_tracker: Optional[SessionTracker],
+    progress_callback: Optional[Callable[[str], None]],
+    st_session_id: Optional[str],
+) -> tuple[str, ResponseUsage]:
+    """Tool-use conversation loop for OpenAI models.
+
+    OpenAI differences from Anthropic:
+    - System prompt is the first message (role='system'), not a separate param.
+    - Tool definitions use 'parameters' inside a 'function' wrapper.
+    - Tool results are 'tool' role messages, not 'user' messages with type='tool_result'.
+    - Token counts are in response.usage.prompt_tokens / completion_tokens.
+    - finish_reason is 'tool_calls' (not 'tool_use') when tools are requested.
+    """
+    client = openai.OpenAI(api_key=OPENAI_API_KEY)
+    openai_tools = _make_openai_tools()
+
+    def update_progress(msg: str):
+        if progress_callback:
+            progress_callback(msg)
+
+    # Prepend system prompt as the first message in the conversation.
+    messages = (
+        [{"role": "system", "content": system_prompt}]
+        + conversation_history
+        + [{"role": "user", "content": user_message}]
+    )
+
+    response_usage = ResponseUsage(question=user_message)
+    tool_call_count = 0
+
+    while tool_call_count <= MAX_TOOL_CALLS_PER_TURN:
+        start_time = time.time()
+        response = None
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    max_tokens=4096,
+                    tools=openai_tools,
+                    messages=messages,
+                )
+                break
+            except openai.RateLimitError:
+                if attempt < MAX_RETRIES - 1:
+                    wait_time = 2 ** attempt * 5
+                    update_progress(
+                        f"Rate limited; waiting {wait_time}s before retry "
+                        f"({attempt + 1}/{MAX_RETRIES})..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
+
+        latency_ms = (time.time() - start_time) * 1000
+        choice = response.choices[0]
+        had_tool_use = choice.finish_reason == "tool_calls"
+
+        api_call = APICall(
+            timestamp=datetime.now(),
+            input_tokens=response.usage.prompt_tokens,
+            output_tokens=response.usage.completion_tokens,
+            model=model,
+            had_tool_use=had_tool_use,
+            latency_ms=latency_ms,
+            # OpenAI doesn't use Anthropic-style prompt caching
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=0,
+        )
+        response_usage.calls.append(api_call)
+
+        log_api_call(
+            timestamp=api_call.timestamp,
+            model=api_call.model,
+            input_tokens=api_call.input_tokens,
+            output_tokens=api_call.output_tokens,
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=0,
+            had_tool_use=api_call.had_tool_use,
+            latency_ms=api_call.latency_ms,
+            question=user_message,
+            session_id=st_session_id,
+        )
+
+        # No tool calls — return the text response
+        if not had_tool_use:
+            final_text = choice.message.content or "(No response generated)"
+            if session_tracker is not None:
+                session_tracker.responses.append(response_usage)
+            return final_text, response_usage
+
+        # Append the assistant message (with tool_calls) so the next turn has context.
+        # We convert the SDK object to a plain dict to keep messages homogeneous.
+        assistant_msg: dict = {
+            "role": "assistant",
+            "content": choice.message.content,  # may be None; that's fine
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in choice.message.tool_calls
+            ],
+        }
+        messages.append(assistant_msg)
+
+        # Execute each tool call and append results as 'tool' role messages.
+        for tc in choice.message.tool_calls:
+            tool_call_count += 1
+            tool_args = json.loads(tc.function.arguments)
+            params_summary = _summarize_tool_params(tc.function.name, tool_args)
+            update_progress(f"Querying: {tc.function.name}({params_summary})")
+            result_str = execute_tool(tc.function.name, tool_args)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": result_str,
+            })
+
+        update_progress("Interpreting results...")
+
+    if session_tracker is not None:
+        session_tracker.responses.append(response_usage)
+    return (
+        "I reached the maximum number of tool calls for this question. "
+        "Please try a more specific query.",
+        response_usage,
+    )
+
+
 # ─── Main conversation function ───────────────────────────────────────────────
 
 def get_response(
@@ -237,8 +406,6 @@ def get_response(
         progress_callback: Optional function that receives status strings for UI display.
                            Called at each step (KB load, tool calls, interpretation).
     """
-    client = anthropic.Anthropic()
-
     def update_progress(msg: str):
         if progress_callback:
             progress_callback(msg)
@@ -251,6 +418,20 @@ def get_response(
     system_prompt = build_system_prompt(include_knowledge=include_kb)
 
     update_progress("Analyzing your question...")
+
+    # Route to OpenAI if the selected model is a GPT model.
+    if _is_openai_model(model):
+        return _get_response_openai(
+            user_message=user_message,
+            conversation_history=conversation_history,
+            model=model,
+            system_prompt=system_prompt,
+            session_tracker=session_tracker,
+            progress_callback=progress_callback,
+            st_session_id=st_session_id,
+        )
+
+    client = anthropic.Anthropic()
 
     # Build the messages list for this turn.
     messages = conversation_history + [{"role": "user", "content": user_message}]

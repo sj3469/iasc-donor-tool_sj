@@ -18,14 +18,18 @@ DB_PATH = DATA_DIR / "donors.db"
 try:
     import streamlit as st
     ANTHROPIC_API_KEY = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+    OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
 except Exception:
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 # Model configuration
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_MODEL = "gpt-5.4-mini"
 AVAILABLE_MODELS = {
-    "claude-sonnet-4-20250514": "Sonnet (recommended)",
-    "claude-haiku-4-5-20251001": "Haiku (faster, cheaper)",
+    "gpt-5.4-mini": "GPT-5.4 mini (fast, cheap)",
+    "gpt-5.4": "GPT-5.4 (capable, moderate cost)",
+    "claude-sonnet-4-20250514": "Claude Sonnet",
+    "claude-haiku-4-5-20251001": "Claude Haiku (faster, cheaper)",
 }
 
 # Tool use limits
