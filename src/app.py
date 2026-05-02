@@ -111,6 +111,7 @@ with st.sidebar:
     # Sample questions — clicking one sets pending_question and reruns the app
     st.subheader("Sample questions")
     sample_questions = [
+        "How does this app work?",
         "Who are our top 10 donors by lifetime giving?",
         "Which lapsed donors in Virginia should we re-engage?",
         "Plan a fundraising trip to NYC: who should we meet?",

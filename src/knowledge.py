@@ -11,6 +11,15 @@ from pathlib import Path
 KNOWLEDGE_DIR = Path(__file__).parent.parent / "knowledge"
 
 
+def load_app_overview() -> str:
+    """Load the app overview document for injection into the system prompt."""
+    overview_path = KNOWLEDGE_DIR / "app_overview.md"
+    if not overview_path.exists():
+        return ""
+    content = overview_path.read_text(encoding="utf-8")
+    return f"<app_overview>\n{content}\n</app_overview>"
+
+
 def load_knowledge_base() -> str:
     """Load all knowledge base documents and format them for the system prompt.
 
@@ -52,7 +61,7 @@ def get_knowledge_token_estimate() -> int:
     Useful for budget planning. Assumes ~0.75 tokens per word.
     """
     total_words = 0
-    for filename in ["fundraising_best_practices.md", "iasc_context.md"]:
+    for filename in ["fundraising_best_practices.md", "iasc_context.md", "app_overview.md"]:
         filepath = KNOWLEDGE_DIR / filename
         if filepath.exists():
             total_words += len(filepath.read_text(encoding="utf-8").split())

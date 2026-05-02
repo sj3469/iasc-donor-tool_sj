@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from knowledge import load_knowledge_base
+from knowledge import load_knowledge_base, load_app_overview
 
 # Concise schema summary injected into the system prompt so Claude knows
 # what fields are available without receiving the full data dictionary.
@@ -59,10 +59,19 @@ Context about IASC's fundraising:
 - They track donors in Salesforce, email engagement in MailChimp, and wealth data via WealthEngine.
 
 About this application:
-- This tool is powered by Anthropic's Claude API (not OpenAI or any other provider).
+- This tool supports both Anthropic (Claude) and OpenAI (GPT) models, selectable in the sidebar.
 - You have a tool called get_app_usage_stats that can retrieve cumulative token usage for this application.
-- If users ask about API usage, billing, or token consumption, use that tool. For detailed billing information, direct them to the Anthropic console at https://console.anthropic.com/ (for API usage) or https://platform.claude.com/usage (for platform usage).
+- If users ask about API usage, billing, or token consumption, use that tool.
 """
+
+APP_OVERVIEW_TRIGGER_KEYWORDS = [
+    "how does this", "how does the app", "how does the tool",
+    "how do you work", "how do you", "what can you do", "what can this",
+    "what does this app", "what does this tool", "explain this app",
+    "explain the app", "explain how", "tell me about this", "about this app",
+    "about the app", "what is this", "architecture", "how it works",
+    "under the hood",
+]
 
 # Keywords that indicate the user's question needs fundraising best-practice context.
 # A false negative just means the response won't reference best practices (minor downside);
@@ -78,6 +87,12 @@ KNOWLEDGE_TRIGGER_KEYWORDS = [
 ]
 
 
+def needs_app_overview(user_message: str) -> bool:
+    """Check whether the user is asking how the app works."""
+    msg_lower = user_message.lower()
+    return any(kw in msg_lower for kw in APP_OVERVIEW_TRIGGER_KEYWORDS)
+
+
 def needs_knowledge_base(user_message: str) -> bool:
     """Check whether the user's question likely needs fundraising best-practice context.
 
@@ -89,33 +104,37 @@ def needs_knowledge_base(user_message: str) -> bool:
     return any(kw in msg_lower for kw in KNOWLEDGE_TRIGGER_KEYWORDS)
 
 
-def build_system_prompt(include_knowledge: bool = False) -> list[dict]:
+def build_system_prompt(
+    include_knowledge: bool = False,
+    include_app_overview: bool = False,
+) -> list[dict]:
     """Assemble the system prompt as a list of content blocks for the API.
 
     Returns a list of dicts suitable for the 'system' parameter of messages.create().
     The last block carries cache_control so the entire prefix is cached by the API.
 
     Args:
-        include_knowledge: If True, append the fundraising knowledge base. Set this
-                           based on needs_knowledge_base() for the current query.
+        include_knowledge: If True, append the fundraising knowledge base.
+        include_app_overview: If True, append the app overview document.
     """
     base_content = BASE_SYSTEM_PROMPT + DB_SCHEMA_SUMMARY
+    extra_blocks = []
+
+    if include_app_overview:
+        extra_blocks.append(load_app_overview())
 
     if include_knowledge:
-        kb_content = load_knowledge_base()
-        # Two blocks: base prompt is a stable cacheable prefix; KB block gets the
-        # cache breakpoint so both are cached together on the second call.
-        return [
-            {"type": "text", "text": base_content},
-            {
-                "type": "text",
-                "text": kb_content,
-                "cache_control": {"type": "ephemeral"},
-            },
-        ]
+        extra_blocks.append(load_knowledge_base())
+
+    if extra_blocks:
+        blocks = [{"type": "text", "text": base_content}]
+        for i, text in enumerate(extra_blocks):
+            block = {"type": "text", "text": text}
+            if i == len(extra_blocks) - 1:
+                block["cache_control"] = {"type": "ephemeral"}
+            blocks.append(block)
+        return blocks
     else:
-        # Single block with a short note so Claude knows the KB exists but isn't loaded.
-        # cache_control here caches the base prompt + schema (~1,500 tokens).
         fallback_note = (
             "\n\nNote: A fundraising best-practices knowledge base is available. "
             "If the user asks about strategy, best practices, or 'how to' questions "

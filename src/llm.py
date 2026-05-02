@@ -19,7 +19,7 @@ import openai
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import DEFAULT_MODEL, MAX_TOOL_CALLS_PER_TURN, OPENAI_API_KEY
-from prompts import build_system_prompt, needs_knowledge_base
+from prompts import build_system_prompt, needs_knowledge_base, needs_app_overview
 from token_tracker import APICall, ResponseUsage, SessionTracker
 from usage_store import log_api_call, get_usage_summary
 import queries
@@ -410,12 +410,14 @@ def get_response(
         if progress_callback:
             progress_callback(msg)
 
-    # Decide whether to include the knowledge base based on the query content.
-    # This skips ~2,000 tokens on pure data queries.
     include_kb = needs_knowledge_base(user_message)
-    if include_kb:
-        update_progress("Loading fundraising knowledge base...")
-    system_prompt = build_system_prompt(include_knowledge=include_kb)
+    include_overview = needs_app_overview(user_message)
+    if include_kb or include_overview:
+        update_progress("Loading knowledge base...")
+    system_prompt = build_system_prompt(
+        include_knowledge=include_kb,
+        include_app_overview=include_overview,
+    )
 
     update_progress("Analyzing your question...")
 
