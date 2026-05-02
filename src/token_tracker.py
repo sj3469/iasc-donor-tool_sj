@@ -44,12 +44,12 @@ MODEL_PRICING = {
         "output_per_mtok": 1.25,
         "display_name": "GPT-5.4 nano",
     },
-    "claude-sonnet-4-20250514": {
+    "claude-sonnet-4-6": {
         "input_per_mtok": 3.00,
         "output_per_mtok": 15.00,
         "display_name": "Claude Sonnet",
     },
-    "claude-haiku-4-5-20251001": {
+    "claude-haiku-4-5": {
         "input_per_mtok": 0.80,
         "output_per_mtok": 4.00,
         "display_name": "Claude Haiku",
@@ -121,7 +121,7 @@ class ResponseUsage:
         Cache reads:  0.10x normal input rate
         Regular input: 1.00x normal input rate
         """
-        pricing = MODEL_PRICING.get(model) or MODEL_PRICING["claude-sonnet-4-20250514"]
+        pricing = MODEL_PRICING.get(model) or MODEL_PRICING["claude-sonnet-4-6"]
         base_rate = pricing["input_per_mtok"]
 
         total_cost = 0.0
@@ -145,7 +145,7 @@ class ResponseUsage:
     def format_inline(self, model: str) -> str:
         """Format for display below a chat response."""
         cost = self.estimated_cost(model)
-        pricing = MODEL_PRICING.get(model) or MODEL_PRICING["claude-sonnet-4-20250514"]
+        pricing = MODEL_PRICING.get(model) or MODEL_PRICING["claude-sonnet-4-6"]
         model_name = pricing["display_name"]
         cache_info = ""
         if self.total_cache_read_tokens > 0:
@@ -181,7 +181,7 @@ class SessionTracker:
         if last_response.calls:
             model = last_response.calls[-1].model
         else:
-            model = "claude-sonnet-4-20250514"
+            model = "claude-sonnet-4-6"
         return sum(r.estimated_cost(model) for r in self.responses)
 
     @property

@@ -28,8 +28,8 @@ DEFAULT_MODEL = "gpt-5.4-mini"
 AVAILABLE_MODELS = {
     "gpt-5.4-mini": "GPT-5.4 mini (fast, cheap)",
     "gpt-5.4": "GPT-5.4 (capable, moderate cost)",
-    "claude-sonnet-4-20250514": "Claude Sonnet",
-    "claude-haiku-4-5-20251001": "Claude Haiku (faster, cheaper)",
+    "claude-sonnet-4-6": "Claude Sonnet",
+    "claude-haiku-4-5": "Claude Haiku (faster, cheaper)",
 }
 
 # Tool use limits
