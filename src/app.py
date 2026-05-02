@@ -229,10 +229,12 @@ if user_input:
                 status.update(label="Done", state="complete", expanded=False)
             except Exception as e:
                 status.update(label="Error", state="error", expanded=False)
-                response_text = (
-                    f"**Error:** {e}\n\n"
-                    "Please check your ANTHROPIC_API_KEY in `.env` and try again."
-                )
+                model = st.session_state.selected_model
+                if model.startswith("gpt-"):
+                    key_hint = "Check that `OPENAI_API_KEY` is set correctly in `.env`."
+                else:
+                    key_hint = "Check that `ANTHROPIC_API_KEY` is set correctly in `.env`."
+                response_text = f"**Error:** {e}\n\n{key_hint}"
                 response_usage = None
 
         st.markdown(response_text)
